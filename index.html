@@ -1,0 +1,44 @@
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="/socket.io/socket.io.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script> ```
+
+**The UI Layout (A single page that hides/shows sections based on role):**
+```html
+<body class="bg-gray-900 text-white font-sans p-6">
+
+    <header class="text-center mb-8">
+        <h1 class="text-3xl font-bold text-blue-400" id="scenario-title">Scenario 1: Legacy Grid</h1>
+        <p id="timer" class="text-xl">Time Remaining: 10:00</p>
+    </header>
+
+    <div id="consumer-view" class="max-w-md mx-auto bg-gray-800 p-6 rounded-lg shadow-lg">
+        <h2 class="text-2xl mb-4">Your Home (Group <span id="my-group"></span>)</h2>
+        <div class="status-light w-full h-32 bg-green-500 rounded-lg mb-4" id="power-status">POWER ON</div>
+        
+        <label>Consumption</label>
+        <input type="range" id="consume-slider" min="0" max="100" class="w-full mb-6">
+        
+        <div id="smart-controls" class="hidden">
+            <label>Solar Production</label>
+            <input type="range" id="produce-slider" min="0" max="100" class="w-full">
+        </div>
+
+        <button id="call-help-btn" class="w-full bg-red-600 p-3 rounded font-bold hidden">CALL GRID MANAGER</button>
+    </div>
+
+    <div id="manager-view" class="hidden grid grid-cols-2 gap-6">
+        <div class="bg-gray-800 p-6 rounded-lg">
+            <h2 class="text-2xl mb-4">Substation Load</h2>
+            </div>
+        <div class="bg-gray-800 p-6 rounded-lg">
+            <h2 class="text-2xl mb-4">Inbox / Alerts</h2>
+            <div id="inbox-list"></div>
+            </div>
+    </div>
+
+    <div id="results-view" class="hidden max-w-4xl mx-auto bg-gray-800 p-6 rounded-lg">
+        <h2 class="text-3xl mb-4 text-center">Simulation Results</h2>
+        <canvas id="resultsChart"></canvas> </div>
+
+    <script src="client.js"></script>
+</body>
