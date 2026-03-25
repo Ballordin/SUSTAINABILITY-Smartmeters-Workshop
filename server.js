@@ -39,6 +39,18 @@ io.on('connection', (socket) => {
         delete gameState.users[socket.id];
         // Re-assign managers if a manager dropped
     });
+
+    socket.on('resolve_issue', (data) => {
+        const targetSocket = io.sockets.sockets.get(data.targetId);
+        
+        if (targetSocket) {
+            // Tell the specific consumer their power is back!
+            targetSocket.emit('power_restored');
+            
+            // Log it for the post-game discussion
+            gameState.metrics.issuesResolved++;
+        }
+    });
 });
 
 // The Game Loop (Runs every second)
