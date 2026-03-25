@@ -8,9 +8,9 @@ app.use(express.static(__dirname));
 
 // The Game State
 let gameState = {
-    scenario: 1, // 1 = Old, 2 = Smart
-    users: {}, // Stores socket.id, role, group (1-4), volatility, consumption
-    managers: [], // Array of current manager socket.ids
+    scenario: 1, 
+    users: {}, 
+    managers: [], 
     groups: {
         1: { capacity: 1000, currentLoad: 0 },
         2: { capacity: 1000, currentLoad: 0 },
@@ -20,100 +20,221 @@ let gameState = {
     metrics: { outages: 0, callsMade: 0, issuesResolved: 0, totalPower: 0 }
 };
 
+// Simulation Timer
+let timerSeconds = 600; // 10 minutes
+let isGameRunning = false;
+
 io.on('connection', (socket) => {
     console.log('User connected:', socket.id);
     
     // 1. Assign Role & Group
     assignRoleAndGroup(socket);
 
-    // 2. Listen for slider updates and calculate Volatility
+    // 2. Listen for slider updates (Consumption AND Production)
     socket.on('update_slider', (data) => {
         let user = gameState.users[socket.id];
-        // Simple volatility math: absolute difference from last reading
-        let change = Math.abs(user.consumption - data.value);
-        user.volatility = (user.volatility + change) / 2; // Rolling average
-        user.consumption = data.value;
+        if (!user) return;
+
+        if (data.type === 'consume') {
+            // Volatility math
+            let change = Math.abs(user.consumption - data.value);
+            user.volatility = (user.volatility + change) / 2;
+            user.consumption = parseInt(data.value);
+        } else if (data.type === 'produce') {
+            user.production = parseInt(data.value);
+        }
     });
 
-    socket.on('disconnect', () => {
-        delete gameState.users[socket.id];
-        // Re-assign managers if a manager dropped
+    // 3. Scenario 1: Manual Help Calls
+    socket.on('call_for_help', (data) => {
+        gameState.metrics.callsMade++;
+        // Route to managers
+        gameState.managers.forEach(managerId => {
+            io.to(managerId).emit('new_ticket', { group: data.group, userId: socket.id });
+        });
     });
 
+    // 4. Resolving Issues
     socket.on('resolve_issue', (data) => {
         const targetSocket = io.sockets.sockets.get(data.targetId);
-        
         if (targetSocket) {
-            // Tell the specific consumer their power is back!
             targetSocket.emit('power_restored');
-            
-            // Log it for the post-game discussion
             gameState.metrics.issuesResolved++;
         }
     });
-    // --- Admin Commands ---
+
+    // 5. Scenario 2: Smart Rerouting
+    socket.on('reroute_power', (data) => {
+        // Divert 200 capacity from safe to overloaded group
+        gameState.groups[data.from].capacity -= 200;
+        gameState.groups[data.to].capacity += 200;
+        console.log(`Rerouted power from Node ${data.from} to Node ${data.to}`);
+    });
+
+    // 6. Admin Commands
     socket.on('admin_change_scenario', (newScenarioId) => {
-        console.log(`Instructor changed scenario to ${newScenarioId}`);
         gameState.scenario = newScenarioId;
-        
-        // Reset the metrics for the new round
-        gameState.metrics = { outages: 0, callsMade: 0, issuesResolved: 0, totalPower: 0 };
-        
-        // Tell everyone in the class that the scenario changed
+        resetGameMetrics();
         io.emit('scenario_changed', newScenarioId);
     });
 
     socket.on('admin_reset_game', () => {
-        // Reset metrics and group loads
-        gameState.metrics = { outages: 0, callsMade: 0, issuesResolved: 0, totalPower: 0 };
-        for (let i = 1; i <= 4; i++) {
-            gameState.groups[i].currentLoad = 0;
-        }
-        io.emit('scenario_changed', gameState.scenario); // Triggers UI reset on clients
+        resetGameMetrics();
+        io.emit('scenario_changed', gameState.scenario); 
+    });
+
+    socket.on('disconnect', () => {
+        delete gameState.users[socket.id];
+        gameState.managers = gameState.managers.filter(id => id !== socket.id);
     });
 });
 
-// The missing Role Assignment Function!
+// --- HELPER FUNCTIONS ---
+
 function assignRoleAndGroup(socket) {
-    // 1. Assign them to Group 1, 2, 3, or 4 randomly
     const groupNum = Math.floor(Math.random() * 4) + 1;
-    
-    // 2. Assign Role (First person to connect is Manager, rest are Consumers)
-    // If you have more than 20 people, you can change this logic later
     const role = gameState.managers.length === 0 ? 'manager' : 'consumer';
     
-    if (role === 'manager') {
-        gameState.managers.push(socket.id);
-    }
+    if (role === 'manager') gameState.managers.push(socket.id);
 
-    // 3. Save to server memory
     gameState.users[socket.id] = {
-        role: role,
-        group: groupNum,
-        consumption: 0,
-        volatility: 0
+        role: role, group: groupNum, consumption: 0, production: 0, volatility: 0
     };
 
-    // 4. Send the data back to the client's screen
-    socket.emit('role_assigned', {
-        role: role,
-        group: groupNum,
-        scenario: gameState.scenario
-    });
+    socket.emit('role_assigned', { role: role, group: groupNum, scenario: gameState.scenario });
 }
 
-// The Game Loop (Runs every second)
+function resetGameMetrics() {
+    gameState.metrics = { outages: 0, callsMade: 0, issuesResolved: 0, totalPower: 0 };
+    for (let i = 1; i <= 4; i++) {
+        gameState.groups[i].currentLoad = 0;
+        gameState.groups[i].capacity = 1000; // reset capacities
+    }
+    timerSeconds = 600; // Reset timer to 10 min
+    isGameRunning = true;
+}
+
+// --- GAME LOOP MECHANICS ---
+
+function calculateGridLoad() {
+    // Reset load counters
+    for (let i = 1; i <= 4; i++) gameState.groups[i].currentLoad = 0;
+
+    for (const id in gameState.users) {
+        const user = gameState.users[id];
+        if (user.role === 'consumer') {
+            // Net load = Consumption - Production (if Scenario 2)
+            let netLoad = user.consumption;
+            if (gameState.scenario === 2) netLoad -= user.production;
+            if (netLoad < 0) netLoad = 0; // Prevent negative loads
+            
+            // Multiply by 5 so slider impacts the 1000 capacity visibly
+            let actualLoad = netLoad * 5; 
+            
+            gameState.groups[user.group].currentLoad += actualLoad;
+            gameState.metrics.totalPower += actualLoad;
+        }
+    }
+}
+
+function checkOutages() {
+    for (let i = 1; i <= 4; i++) {
+        const group = gameState.groups[i];
+        const loadPercentage = group.currentLoad / group.capacity;
+
+        // Scenario 2: Proactive Alerting (90% capacity)
+        if (gameState.scenario === 2 && loadPercentage > 0.90 && loadPercentage <= 1.0) {
+            let safeGroup = Object.keys(gameState.groups).find(k => (gameState.groups[k].currentLoad / gameState.groups[k].capacity) < 0.6);
+            if (safeGroup) {
+                gameState.managers.forEach(mgrId => {
+                    io.to(mgrId).emit('predictive_alert', { overloadedGroup: i, safeGroup: safeGroup });
+                });
+            }
+        }
+
+        // Both Scenarios: Tripping the Breaker
+        if (loadPercentage > 1.0) {
+            // Get consumers in this group
+            let consumers = Object.keys(gameState.users).filter(id => gameState.users[id].group == i && gameState.users[id].role === 'consumer');
+            
+            if (consumers.length > 0) {
+                // Sort by who is most volatile!
+                consumers.sort((a, b) => gameState.users[b].volatility - gameState.users[a].volatility);
+                let victimId = consumers[0]; // Trip the worst offender
+
+                // Only trip them if they aren't already out of power (consumption > 0)
+                if (gameState.users[victimId].consumption > 0) {
+                    io.to(victimId).emit('outage_event');
+                    gameState.users[victimId].consumption = 0;
+                    gameState.metrics.outages++;
+
+                    // Scenario 2: Smart Meter Auto-Reports
+                    if (gameState.scenario === 2) {
+                        gameState.managers.forEach(mgrId => {
+                            io.to(mgrId).emit('new_ticket', { group: i, userId: victimId });
+                        });
+                    }
+                }
+            }
+        }
+    }
+}
+
+function rotateManagers() {
+    if (Object.keys(gameState.users).length < 2) return; // Need at least 2 people
+
+    let oldManagerId = gameState.managers.shift(); 
+    let consumers = Object.keys(gameState.users).filter(id => gameState.users[id].role === 'consumer');
+    
+    if (consumers.length > 0) {
+        // Pick a random consumer to promote
+        let newManagerId = consumers[Math.floor(Math.random() * consumers.length)];
+        
+        // Demote
+        if (gameState.users[oldManagerId]) {
+            gameState.users[oldManagerId].role = 'consumer';
+            io.to(oldManagerId).emit('role_assigned', { role: 'consumer', group: gameState.users[oldManagerId].group, scenario: gameState.scenario });
+        }
+
+        // Promote
+        gameState.users[newManagerId].role = 'manager';
+        gameState.managers.push(newManagerId);
+        io.to(newManagerId).emit('role_assigned', { role: 'manager', group: gameState.users[newManagerId].group, scenario: gameState.scenario });
+    } else {
+        if(oldManagerId) gameState.managers.push(oldManagerId); // Put them back
+    }
+}
+
+// --- MASTER LOOPS ---
+
+// Fast Loop: Physics & Math (1 second)
 setInterval(() => {
-    calculateGridLoad();
-    checkOutages();
-    io.emit('state_update', gameState); // Send fresh data to everyone
+    if (isGameRunning) {
+        calculateGridLoad();
+        checkOutages();
+        io.emit('state_update', gameState);
+
+        // Timer Logic
+        timerSeconds--;
+        let mins = Math.floor(timerSeconds / 60);
+        let secs = timerSeconds % 60;
+        let timeString = `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+        io.emit('time_update', timeString);
+
+        if (timerSeconds <= 0) {
+            isGameRunning = false;
+            io.emit('simulation_ended', gameState.metrics);
+        }
+    }
 }, 1000);
 
-// Role Rotation Timer (Every 90 seconds)
+// Slow Loop: Role Rotation (90 seconds)
 setInterval(() => {
-    rotateManagers();
-    io.emit('role_swap_alert', { message: "Roles rotating in 5 seconds!" });
+    if (isGameRunning) {
+        io.emit('role_swap_alert', { message: "Roles rotating in 5 seconds!" });
+        setTimeout(rotateManagers, 5000); // Actually swap 5 seconds after warning
+    }
 }, 90000);
 
-http.listen(3000, () => console.log('Grid Server running on port 3000'));
-
+// Start server (Replit defaults to port 3000)
+http.listen(3000, () => console.log('Smart Grid Simulation running!'));

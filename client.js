@@ -130,7 +130,8 @@ socket.on('new_ticket', (ticketData) => {
             const targetId = e.target.getAttribute('data-id');
             if (currentScenario === 1) {
                 // Open the chat interface (Next feature to build!)
-                console.log("Starting chat with", targetId);
+                openChatModal();
+                ticket.remove(); // Remove ticket from inbox once answered
             } else {
                 // Instant fix for Smart Grid
                 socket.emit('resolve_issue', { targetId: targetId });
@@ -397,4 +398,40 @@ socket.on('scenario_changed', (newScenarioId) => {
     resultsView.classList.add('hidden');
     if (myRole === 'consumer') consumerView.classList.remove('hidden');
     if (myRole === 'manager') managerView.classList.remove('hidden');
+});
+
+// Update UI based on live server state
+socket.on('state_update', (state) => {
+    // Only Managers need to see the bars update
+    if (myRole === 'manager') {
+        for (let i = 1; i <= 4; i++) {
+            const bar = document.getElementById(`load-bar-${i}`);
+            if (bar && state.groups[i]) {
+                // Calculate percentage (assuming 1000 is capacity for now)
+                let percentage = (state.groups[i].currentLoad / state.groups[i].capacity) * 100;
+                
+                // Cap it at 100% for the visual bar
+                if (percentage > 100) percentage = 100; 
+                
+                bar.style.width = `${percentage}%`;
+
+                // Change color if overloaded
+                if (percentage > 90) {
+                    bar.classList.replace('bg-blue-500', 'bg-red-600');
+                } else if (percentage > 75) {
+                    bar.classList.replace('bg-blue-500', 'bg-yellow-500');
+                    bar.classList.replace('bg-red-600', 'bg-yellow-500');
+                } else {
+                    bar.classList.replace('bg-yellow-500', 'bg-blue-500');
+                    bar.classList.replace('bg-red-600', 'bg-blue-500');
+                }
+            }
+        }
+    }
+});
+
+// Update the visual clock
+const timerDisplay = document.getElementById('timer');
+socket.on('time_update', (timeString) => {
+    timerDisplay.innerText = `Time Remaining: ${timeString}`;
 });
