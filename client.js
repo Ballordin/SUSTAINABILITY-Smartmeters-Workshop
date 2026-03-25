@@ -274,6 +274,108 @@ btnReset.addEventListener('click', () => {
     }
 });
 
+const predictiveRoutingPanel = document.getElementById('predictive-routing-panel');
+const routingSuggestions = document.getElementById('routing-suggestions');
+
+// Listen for predictive alerts from the server
+socket.on('predictive_alert', (data) => {
+    if (myRole === 'manager' && currentScenario === 2) {
+        predictiveRoutingPanel.classList.remove('hidden');
+        
+        // Create a suggestion card
+        const suggestion = document.createElement('div');
+        suggestion.className = 'bg-gray-700 p-3 rounded flex justify-between items-center';
+        suggestion.innerHTML = `
+            <span><b>Node ${data.overloadedGroup}</b> is at 90% capacity. Node ${data.safeGroup} has excess. Reroute 15% power?</span>
+            <button class="bg-yellow-500 hover:bg-yellow-400 text-black font-bold px-4 py-2 rounded reroute-btn" 
+                    data-from="${data.safeGroup}" data-to="${data.overloadedGroup}">
+                Execute Reroute
+            </button>
+        `;
+        
+        routingSuggestions.appendChild(suggestion);
+
+        // Handle the 1-click reroute
+        suggestion.querySelector('.reroute-btn').addEventListener('click', (e) => {
+            const fromGroup = e.target.getAttribute('data-from');
+            const toGroup = e.target.getAttribute('data-to');
+            
+            // Tell server to move the power
+            socket.emit('reroute_power', { from: fromGroup, to: toGroup });
+            
+            // Clear the suggestion
+            suggestion.remove();
+            if (routingSuggestions.children.length === 0) {
+                predictiveRoutingPanel.classList.add('hidden');
+            }
+        });
+    }
+});
+
+// Function to render the final chart
+socket.on('simulation_ended', (finalMetrics) => {
+    // Hide game views, show results
+    consumerView.classList.add('hidden');
+    managerView.classList.add('hidden');
+    resultsView.classList.remove('hidden');
+
+    const ctx = document.getElementById('resultsChart').getContext('2d');
+
+    // Create a beautiful Bar Chart comparing this session's stats
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: [
+                'Total Outages', 
+                'Distress Calls Made', 
+                'Issues Resolved', 
+                'Total Grid Strain (Megawatts)'
+            ],
+            datasets: [{
+                label: `Scenario ${currentScenario} Results`,
+                // Scale down total power just so it fits on the same graph visually
+                data: [
+                    finalMetrics.outages, 
+                    finalMetrics.callsMade, 
+                    finalMetrics.issuesResolved, 
+                    finalMetrics.totalPower / 1000 
+                ],
+                backgroundColor: [
+                    'rgba(239, 68, 68, 0.7)',  // Red for outages
+                    'rgba(245, 158, 11, 0.7)', // Yellow for calls
+                    'rgba(16, 185, 129, 0.7)', // Green for resolves
+                    'rgba(59, 130, 246, 0.7)'  // Blue for power
+                ],
+                borderColor: [
+                    'rgb(239, 68, 68)',
+                    'rgb(245, 158, 11)',
+                    'rgb(16, 185, 129)',
+                    'rgb(59, 130, 246)'
+                ],
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                y: { beginAtZero: true }
+            },
+            plugins: {
+                legend: { display: false },
+                title: {
+                    display: true,
+                    text: 'Classroom Grid Performance',
+                    color: 'white',
+                    font: { size: 20 }
+                }
+            }
+        }
+    });
+
+    // You can also populate a raw HTML table right below the chart with these stats
+    // so you have exact numbers to point to!
+});
+
 // 3. Listen for Scenario Changes from the server
 socket.on('scenario_changed', (newScenarioId) => {
     currentScenario = newScenarioId;
