@@ -51,6 +51,26 @@ io.on('connection', (socket) => {
             gameState.metrics.issuesResolved++;
         }
     });
+    // --- Admin Commands ---
+    socket.on('admin_change_scenario', (newScenarioId) => {
+        console.log(`Instructor changed scenario to ${newScenarioId}`);
+        gameState.scenario = newScenarioId;
+        
+        // Reset the metrics for the new round
+        gameState.metrics = { outages: 0, callsMade: 0, issuesResolved: 0, totalPower: 0 };
+        
+        // Tell everyone in the class that the scenario changed
+        io.emit('scenario_changed', newScenarioId);
+    });
+
+    socket.on('admin_reset_game', () => {
+        // Reset metrics and group loads
+        gameState.metrics = { outages: 0, callsMade: 0, issuesResolved: 0, totalPower: 0 };
+        for (let i = 1; i <= 4; i++) {
+            gameState.groups[i].currentLoad = 0;
+        }
+        io.emit('scenario_changed', gameState.scenario); // Triggers UI reset on clients
+    });
 });
 
 // The Game Loop (Runs every second)
@@ -67,3 +87,4 @@ setInterval(() => {
 }, 90000);
 
 http.listen(3000, () => console.log('Grid Server running on port 3000'));
+

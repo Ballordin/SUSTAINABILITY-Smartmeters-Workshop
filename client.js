@@ -244,3 +244,55 @@ restorePowerBtn.addEventListener('click', () => {
     // Close the modal
     chatModal.classList.add('hidden');
 });
+
+// --- Admin Controls ---
+const adminPanel = document.getElementById('admin-panel');
+const btnStartScen1 = document.getElementById('btn-start-scen1');
+const btnStartScen2 = document.getElementById('btn-start-scen2');
+const btnReset = document.getElementById('btn-reset');
+const adminCurrentScenario = document.getElementById('admin-current-scenario');
+const scenarioTitle = document.getElementById('scenario-title');
+
+// 1. Check if the URL has "?admin=true"
+const urlParams = new URLSearchParams(window.location.search);
+if (urlParams.get('admin') === 'true') {
+    adminPanel.classList.remove('hidden');
+}
+
+// 2. Admin Button Listeners
+btnStartScen1.addEventListener('click', () => {
+    socket.emit('admin_change_scenario', 1);
+});
+
+btnStartScen2.addEventListener('click', () => {
+    socket.emit('admin_change_scenario', 2);
+});
+
+btnReset.addEventListener('click', () => {
+    if(confirm("Are you sure? This will wipe the current metrics.")) {
+        socket.emit('admin_reset_game');
+    }
+});
+
+// 3. Listen for Scenario Changes from the server
+socket.on('scenario_changed', (newScenarioId) => {
+    currentScenario = newScenarioId;
+    
+    // Update titles
+    scenarioTitle.innerText = `Scenario ${newScenarioId}: ${newScenarioId === 1 ? 'Legacy Grid' : 'Smart Grid'}`;
+    adminCurrentScenario.innerText = `Scenario ${newScenarioId}`;
+    
+    // Hide/Show Smart UI elements for consumers
+    if (myRole === 'consumer') {
+        if (newScenarioId === 2) {
+            smartControls.classList.remove('hidden');
+        } else {
+            smartControls.classList.add('hidden');
+        }
+    }
+    
+    // Hide results if we are starting a new round
+    resultsView.classList.add('hidden');
+    if (myRole === 'consumer') consumerView.classList.remove('hidden');
+    if (myRole === 'manager') managerView.classList.remove('hidden');
+});
