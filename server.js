@@ -237,4 +237,4 @@ setInterval(() => {
 }, 90000);
 
 // Start server (Replit defaults to port 3000)
-http.listen(3000, () => console.log('Smart Grid Simulation running!'));
+http.listen(process.env.PORT || 3000, () => console.log('Smart Grid Simulation running!'));
