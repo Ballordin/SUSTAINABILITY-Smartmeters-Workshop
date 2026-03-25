@@ -73,6 +73,35 @@ io.on('connection', (socket) => {
     });
 });
 
+// The missing Role Assignment Function!
+function assignRoleAndGroup(socket) {
+    // 1. Assign them to Group 1, 2, 3, or 4 randomly
+    const groupNum = Math.floor(Math.random() * 4) + 1;
+    
+    // 2. Assign Role (First person to connect is Manager, rest are Consumers)
+    // If you have more than 20 people, you can change this logic later
+    const role = gameState.managers.length === 0 ? 'manager' : 'consumer';
+    
+    if (role === 'manager') {
+        gameState.managers.push(socket.id);
+    }
+
+    // 3. Save to server memory
+    gameState.users[socket.id] = {
+        role: role,
+        group: groupNum,
+        consumption: 0,
+        volatility: 0
+    };
+
+    // 4. Send the data back to the client's screen
+    socket.emit('role_assigned', {
+        role: role,
+        group: groupNum,
+        scenario: gameState.scenario
+    });
+}
+
 // The Game Loop (Runs every second)
 setInterval(() => {
     calculateGridLoad();
