@@ -126,6 +126,11 @@ function assignRoleAndGroup(socket) {
     };
 
     socket.emit('role_assigned', { role: role, group: groupNum, scenario: gameState.scenario });
+
+    // NEW FIX: Instantly sync the clock for latecomers!
+    let mins = Math.floor(timerSeconds / 60);
+    let secs = timerSeconds % 60;
+    socket.emit('time_update', `${mins}:${secs < 10 ? '0' : ''}${secs}`);
 }
 
 function resetGameMetrics() {

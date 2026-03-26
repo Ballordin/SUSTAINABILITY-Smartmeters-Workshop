@@ -198,11 +198,17 @@ socket.on('predictive_alert', (data) => {
     }
 });
 
-// --- 6. Chat Modal Logic (Manager) ---
+/// --- 6. Chat Modal Logic (Manager) ---
+let isWaitingForReply = false;
+let chatTimeout; // Failsafe if consumer ignores them
+
 function openChatModal(targetId) {
     currentChatTargetId = targetId;
     chatUserIdSpan.innerText = `User ${targetId.substring(0,4)}`;
     diagnosticProgress = 0;
+    isWaitingForReply = false; 
+    clearTimeout(chatTimeout);
+    
     resolutionBar.style.width = '0%';
     chatHistory.innerHTML = '<div class="text-gray-400 italic">Connection established with consumer...</div>';
     
@@ -223,6 +229,9 @@ closeChatBtn.addEventListener('click', () => {
 // Manager receives the reply from the consumer
 socket.on('incoming_reply', (data) => {
     if (myRole === 'manager') {
+        isWaitingForReply = false; // UNLOCK!
+        clearTimeout(chatTimeout); // Clear the failsafe
+
         chatHistory.innerHTML += `<div class="text-white"><b>Consumer:</b> ${data.answer}</div>`;
         chatHistory.scrollTop = chatHistory.scrollHeight;
         
@@ -239,14 +248,35 @@ socket.on('incoming_reply', (data) => {
 // Manager asks a question
 diagButtons.forEach(btn => {
     btn.addEventListener('click', (e) => {
-        const question = e.target.getAttribute('data-q');
-        const answer = e.target.getAttribute('data-a');
+        if (isWaitingForReply) return; // Prevent speed-clicking!
+
+        const targetBtn = e.currentTarget;
+        const question = targetBtn.getAttribute('data-q');
+        const answer = targetBtn.getAttribute('data-a');
         
-        e.target.disabled = true;
-        e.target.classList.add('opacity-50', 'cursor-not-allowed');
+        targetBtn.disabled = true;
+        targetBtn.classList.add('opacity-50', 'cursor-not-allowed');
 
         chatHistory.innerHTML += `<div class="text-blue-400 mt-2"><b>You:</b> ${question}</div>`;
         chatHistory.scrollTop = chatHistory.scrollHeight; 
+
+        isWaitingForReply = true; // LOCK!
+
+        // 10-Second Failsafe (If consumer ignores the chat)
+        chatTimeout = setTimeout(() => {
+            if (isWaitingForReply) {
+                isWaitingForReply = false;
+                chatHistory.innerHTML += `<div class="text-gray-500 italic"><b>System:</b> Consumer unresponsive. Auto-diagnosing...</div>`;
+                chatHistory.scrollTop = chatHistory.scrollHeight;
+                
+                diagnosticProgress += 25;
+                resolutionBar.style.width = `${diagnosticProgress}%`;
+                if (diagnosticProgress >= 100) {
+                    restorePowerBtn.disabled = false;
+                    restorePowerBtn.innerText = "RESTORE POWER TO USER";
+                }
+            }
+        }, 10000);
 
         socket.emit('manager_ask_question', { 
             targetId: currentChatTargetId, 
