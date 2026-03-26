@@ -26,11 +26,10 @@
 
     <header class="text-center mb-8">
         <h1 class="text-3xl font-bold text-blue-400" id="scenario-title">Scenario 1: Legacy Grid</h1>
-        <p id="timer" class="text-xl">Time Remaining: 10:00</p>
+        <p id="timer" class="text-xl text-yellow-400 font-mono mt-2">Time Remaining: 10:00</p>
     </header>
 
-    <div id="consumer-view" class="hidden max-w-md mx-auto bg-gray-800 p-6 rounded-lg shadow-lg">
-        <div id="consumer-view" class="hidden max-w-md mx-auto bg-gray-800 p-6 rounded-lg shadow-lg">
+    <div id="consumer-view" class="hidden max-w-md mx-auto bg-gray-800 p-6 rounded-lg shadow-lg border border-gray-700">
         
         <div class="flex justify-between items-center mb-4">
             <h2 class="text-2xl">Your Home (Node <span id="my-group"></span>)</h2>
@@ -39,94 +38,95 @@
             </div>
         </div>
 
-        <h2 class="text-2xl mb-4">Your Home (Group <span id="my-group"></span>)</h2>
-        <div class="flex items-center justify-center w-full h-32 bg-green-500 rounded-lg mb-4 text-2xl font-bold" id="power-status">
+        <div class="flex items-center justify-center w-full h-32 bg-green-500 rounded-lg mb-4 text-2xl font-bold shadow-inner transition-colors duration-300" id="power-status">
             POWER ON
         </div>
         
-        <label class="block mb-2 font-semibold">Consumption</label>
-        <input type="range" id="consume-slider" min="0" max="100" class="w-full mb-6">
+        <label class="block mb-2 font-semibold text-gray-300">Power Consumption</label>
+        <input type="range" id="consume-slider" min="0" max="100" value="0" class="w-full mb-6 cursor-pointer">
         
-        <div id="smart-controls" class="hidden mb-6">
-            <label class="block mb-2 font-semibold text-yellow-400">Solar Production</label>
-            <input type="range" id="produce-slider" min="0" max="100" class="w-full">
+        <div id="smart-controls" class="hidden mb-6 bg-gray-700 p-4 rounded-lg border border-yellow-600">
+            <label class="block mb-2 font-semibold text-yellow-400">☀️ Solar Production</label>
+            <input type="range" id="produce-slider" min="0" max="100" value="0" class="w-full cursor-pointer">
         </div>
 
-        <button id="call-help-btn" class="w-full bg-red-600 hover:bg-red-500 p-3 rounded font-bold hidden text-white shadow-lg">
+        <button id="call-help-btn" class="w-full bg-red-600 hover:bg-red-500 p-4 rounded font-bold hidden text-white shadow-lg transition-transform active:scale-95 text-lg">
             CALL GRID MANAGER
         </button>
     </div>
 
     <div id="manager-view" class="hidden grid grid-cols-2 gap-6 max-w-6xl mx-auto">
         
-        <div id="predictive-routing-panel" class="col-span-2 bg-gray-800 p-6 rounded-lg hidden border border-yellow-500 mt-4">
+        <div id="predictive-routing-panel" class="col-span-2 bg-gray-800 p-6 rounded-lg hidden border border-yellow-500 mt-4 shadow-lg">
             <h2 class="text-2xl mb-4 text-yellow-400 font-bold">⚠️ Predictive Load Routing</h2>
             <div id="routing-suggestions" class="space-y-2">
                 </div>
         </div>
 
-        <div class="bg-gray-800 p-6 rounded-lg">
-            <h2 class="text-2xl mb-4">Substation Load</h2>
-            <div id="substation-bars" class="space-y-4">
-                <div>Node 1 <div class="w-full bg-gray-700 h-4 rounded"><div id="load-bar-1" class="bg-blue-500 h-4 rounded" style="width: 0%"></div></div></div>
-                <div>Node 2 <div class="w-full bg-gray-700 h-4 rounded"><div id="load-bar-2" class="bg-blue-500 h-4 rounded" style="width: 0%"></div></div></div>
-                <div>Node 3 <div class="w-full bg-gray-700 h-4 rounded"><div id="load-bar-3" class="bg-blue-500 h-4 rounded" style="width: 0%"></div></div></div>
-                <div>Node 4 <div class="w-full bg-gray-700 h-4 rounded"><div id="load-bar-4" class="bg-blue-500 h-4 rounded" style="width: 0%"></div></div></div>
+        <div class="bg-gray-800 p-6 rounded-lg border border-gray-700 shadow-lg">
+            <h2 class="text-2xl mb-4 text-blue-400 font-bold">Substation Load</h2>
+            <div id="substation-bars" class="space-y-6">
+                <div><span class="font-bold text-gray-300">Node 1</span> <div class="w-full bg-gray-900 h-6 rounded border border-gray-600 mt-1"><div id="load-bar-1" class="bg-blue-500 h-6 rounded transition-all duration-300" style="width: 0%"></div></div></div>
+                <div><span class="font-bold text-gray-300">Node 2</span> <div class="w-full bg-gray-900 h-6 rounded border border-gray-600 mt-1"><div id="load-bar-2" class="bg-blue-500 h-6 rounded transition-all duration-300" style="width: 0%"></div></div></div>
+                <div><span class="font-bold text-gray-300">Node 3</span> <div class="w-full bg-gray-900 h-6 rounded border border-gray-600 mt-1"><div id="load-bar-3" class="bg-blue-500 h-6 rounded transition-all duration-300" style="width: 0%"></div></div></div>
+                <div><span class="font-bold text-gray-300">Node 4</span> <div class="w-full bg-gray-900 h-6 rounded border border-gray-600 mt-1"><div id="load-bar-4" class="bg-blue-500 h-6 rounded transition-all duration-300" style="width: 0%"></div></div></div>
             </div>
         </div>
 
-        <div class="bg-gray-800 p-6 rounded-lg">
-            <h2 class="text-2xl mb-4">Inbox / Alerts</h2>
-            <div id="inbox-list" class="space-y-2 max-h-64 overflow-y-auto">
+        <div class="bg-gray-800 p-6 rounded-lg border border-gray-700 shadow-lg">
+            <h2 class="text-2xl mb-4 text-red-400 font-bold">Inbox / Alerts</h2>
+            <div id="inbox-list" class="space-y-3 max-h-80 overflow-y-auto pr-2">
                 </div>
         </div>
     </div>
 
-    <div id="results-view" class="hidden max-w-4xl mx-auto bg-gray-800 p-6 rounded-lg">
-        <h2 class="text-3xl mb-4 text-center">Simulation Results</h2>
+    <div id="results-view" class="hidden max-w-4xl mx-auto bg-gray-800 p-8 rounded-lg border border-blue-500 shadow-2xl mt-8">
+        <h2 class="text-4xl mb-6 text-center font-bold text-white">Simulation Results</h2>
         <canvas id="resultsChart"></canvas>
     </div>
 
-    <div id="chat-modal" class="hidden fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4 z-50">
-        <div class="bg-gray-800 rounded-lg p-6 w-full max-w-lg border border-gray-600 shadow-2xl">
+    <div id="chat-modal" class="hidden fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center p-4 z-50">
+        <div class="bg-gray-800 rounded-lg p-6 w-full max-w-lg border-2 border-blue-600 shadow-2xl">
             <div class="flex justify-between items-center mb-4">
                 <h3 class="text-xl font-bold text-blue-400">Dispatch Chat: <span id="chat-user-id"></span></h3>
-                <button id="close-chat-btn" class="text-gray-400 hover:text-white text-2xl leading-none">&times;</button>
+                <button id="close-chat-btn" class="text-gray-400 hover:text-white text-3xl leading-none">&times;</button>
             </div>
 
-            <div id="chat-history" class="bg-gray-900 h-48 rounded p-3 mb-4 overflow-y-auto text-sm space-y-2">
-                <div class="text-gray-400 italic">Connection established with consumer...</div>
+            <div id="chat-history" class="bg-gray-900 h-56 rounded p-4 mb-4 overflow-y-auto text-sm space-y-3 border border-gray-700">
+                <div class="text-gray-400 italic text-center text-xs">Connection established with consumer...</div>
             </div>
 
-            <div class="w-full bg-gray-700 rounded-full h-4 mb-4">
+            <div class="w-full bg-gray-900 rounded-full h-4 mb-6 border border-gray-700">
                 <div id="resolution-bar" class="bg-blue-600 h-4 rounded-full transition-all duration-500" style="width: 0%"></div>
             </div>
 
-            <div id="question-buttons" class="grid grid-cols-2 gap-2 mb-4">
-                <button class="diag-btn bg-gray-700 hover:bg-gray-600 p-2 rounded text-sm text-left" data-q="Have you checked your main breaker?" data-a="Yes, it's not tripped.">1. Check Main Breaker</button>
-                <button class="diag-btn bg-gray-700 hover:bg-gray-600 p-2 rounded text-sm text-left" data-q="Are your neighbors out of power too?" data-a="Yes, the whole street is dark.">2. Ask About Neighbors</button>
-                <button class="diag-btn bg-gray-700 hover:bg-gray-600 p-2 rounded text-sm text-left" data-q="Did you hear any loud pops outside?" data-a="No, everything just went quiet.">3. Check for Transformer Pop</button>
-                <button class="diag-btn bg-gray-700 hover:bg-gray-600 p-2 rounded text-sm text-left" data-q="Were you running heavy appliances?" data-a="Maybe just the AC and the oven...">4. Ask About Local Load</button>
+            <div id="question-buttons" class="grid grid-cols-2 gap-3 mb-6">
+                <button class="diag-btn bg-gray-700 hover:bg-gray-600 p-3 rounded text-sm text-left font-semibold border border-gray-600 shadow" data-q="Have you checked your main breaker?" data-a="Yes, it's not tripped.">1. Check Breaker</button>
+                <button class="diag-btn bg-gray-700 hover:bg-gray-600 p-3 rounded text-sm text-left font-semibold border border-gray-600 shadow" data-q="Are your neighbors out of power too?" data-a="Yes, the whole street is dark.">2. Ask Neighbors</button>
+                <button class="diag-btn bg-gray-700 hover:bg-gray-600 p-3 rounded text-sm text-left font-semibold border border-gray-600 shadow" data-q="Did you hear any loud pops outside?" data-a="No, everything just went quiet.">3. Check Transformer</button>
+                <button class="diag-btn bg-gray-700 hover:bg-gray-600 p-3 rounded text-sm text-left font-semibold border border-gray-600 shadow" data-q="Were you running heavy appliances?" data-a="Maybe just the AC and the oven...">4. Check Local Load</button>
             </div>
 
-            <button id="restore-power-btn" class="w-full bg-green-600 hover:bg-green-500 p-3 rounded font-bold disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+            <button id="restore-power-btn" class="w-full bg-green-600 hover:bg-green-500 p-4 rounded font-bold text-lg disabled:opacity-50 disabled:cursor-not-allowed text-white shadow" disabled>
                 DIAGNOSTICS INCOMPLETE
             </button>
         </div>
     </div>
-    
+
     <div id="consumer-chat-modal" class="hidden fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center p-4 z-50">
-        <div class="bg-gray-800 rounded-lg p-6 w-full max-w-md border-2 border-red-600 shadow-2xl text-center">
-            <h3 class="text-2xl font-bold text-red-500 mb-4">🚨 Dispatch is calling...</h3>
-            <p class="text-gray-300 mb-2">Grid Manager asks:</p>
-            <div id="consumer-incoming-question" class="text-blue-400 font-bold text-xl mb-6 p-4 bg-gray-900 rounded">
+        <div class="bg-gray-800 rounded-lg p-8 w-full max-w-md border-2 border-red-600 shadow-2xl text-center">
+            <div class="animate-pulse mb-4">
+                <h3 class="text-3xl font-bold text-red-500">🚨 Dispatch is calling</h3>
+            </div>
+            <p class="text-gray-300 mb-4 text-lg">Grid Manager asks:</p>
+            <div id="consumer-incoming-question" class="text-blue-400 font-bold text-xl mb-8 p-6 bg-gray-900 rounded border border-gray-700 shadow-inner">
                 </div>
-            <button id="consumer-reply-btn" class="w-full bg-blue-600 hover:bg-blue-500 p-4 rounded font-bold text-white text-lg transition-transform active:scale-95">
-                Reply: <span id="consumer-reply-text"></span>
+            <button id="consumer-reply-btn" class="w-full bg-blue-600 hover:bg-blue-500 p-5 rounded font-bold text-white text-lg transition-transform active:scale-95 shadow-lg">
+                Reply: <span id="consumer-reply-text" class="italic font-normal ml-1"></span>
             </button>
         </div>
     </div>
-    
+
     <script src="client.js"></script>
 </body>
 </html>
