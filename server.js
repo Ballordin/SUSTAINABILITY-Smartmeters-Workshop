@@ -138,6 +138,31 @@ function calculateGridLoad() {
 }
 
 function checkOutages() {
+    // 1. NEW: The "Personal Breaker" for Erratic Sliders
+    for (const id in gameState.users) {
+        let user = gameState.users[id];
+        if (user.role === 'consumer' && user.consumption > 0) {
+            // Cool down their volatility slightly every second so good behavior is rewarded
+            user.volatility = user.volatility * 0.8; 
+
+            // If they jerked the slider too fast, blow their personal fuse!
+            if (user.volatility > 25) { // 25 is the threshold for erratic behavior
+                io.to(id).emit('outage_event');
+                user.consumption = 0;
+                user.volatility = 0; // Reset their volatility after a crash
+                gameState.metrics.outages++;
+
+                // Notify manager if Scenario 2
+                if (gameState.scenario === 2) {
+                    gameState.managers.forEach(mgrId => {
+                        io.to(mgrId).emit('new_ticket', { group: user.group, userId: id });
+                    });
+                }
+            }
+        }
+    }
+
+    // 2. EXISTING: Substation Overload Logic
     for (let i = 1; i <= 4; i++) {
         const group = gameState.groups[i];
         const loadPercentage = group.currentLoad / group.capacity;
@@ -152,23 +177,20 @@ function checkOutages() {
             }
         }
 
-        // Both Scenarios: Tripping the Breaker
+        // Both Scenarios: Tripping the Substation Breaker
         if (loadPercentage > 1.0) {
-            // Get consumers in this group
             let consumers = Object.keys(gameState.users).filter(id => gameState.users[id].group == i && gameState.users[id].role === 'consumer');
             
             if (consumers.length > 0) {
-                // Sort by who is most volatile!
+                // Sort by who is most volatile and trip them first
                 consumers.sort((a, b) => gameState.users[b].volatility - gameState.users[a].volatility);
-                let victimId = consumers[0]; // Trip the worst offender
+                let victimId = consumers[0]; 
 
-                // Only trip them if they aren't already out of power (consumption > 0)
                 if (gameState.users[victimId].consumption > 0) {
                     io.to(victimId).emit('outage_event');
                     gameState.users[victimId].consumption = 0;
                     gameState.metrics.outages++;
 
-                    // Scenario 2: Smart Meter Auto-Reports
                     if (gameState.scenario === 2) {
                         gameState.managers.forEach(mgrId => {
                             io.to(mgrId).emit('new_ticket', { group: i, userId: victimId });
