@@ -285,35 +285,15 @@ function rotateManagers() {
 
 // --- MASTER LOOPS ---
 
-// Fast Loop: Physics & Math (1 second)
+// Fast Loop: Physics, Math, & Consumer Tasks (Runs every 1 second)
 setInterval(() => {
     if (isGameRunning) {
+        // 1. Grid Math
         calculateGridLoad();
         checkOutages();
-        io.emit('state_update', gameState);
+        assignConsumerTasks(); 
 
-        // Timer Logic
-        timerSeconds--;
-        let mins = Math.floor(timerSeconds / 60);
-        let secs = timerSeconds % 60;
-        let timeString = `${mins}:${secs < 10 ? '0' : ''}${secs}`;
-        io.emit('time_update', timeString);
-
-        if (timerSeconds <= 0) {
-            isGameRunning = false;
-            io.emit('simulation_ended', gameState.metrics);
-        }
-    }
-}, 1000);
-
-// Slow Loop: Role Rotation (90 seconds)
-setInterval(() => {
-    if (isGameRunning) {
-        calculateGridLoad();
-        checkOutages();
-        assignConsumerTasks(); // <-- ADD THIS
-
-        // NEW: Check Task Progress
+        // 2. Check Task Progress
         for (const id in gameState.users) {
             let user = gameState.users[id];
             if (user.role === 'consumer' && user.currentTask) {
@@ -337,13 +317,30 @@ setInterval(() => {
             }
         }
 
+        // 3. Send state to frontend
         io.emit('state_update', gameState);
-        
+
+        // 4. Timer Logic
+        timerSeconds--;
+        let mins = Math.floor(timerSeconds / 60);
+        let secs = timerSeconds % 60;
+        let timeString = `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+        io.emit('time_update', timeString);
+
+        if (timerSeconds <= 0) {
+            isGameRunning = false;
+            io.emit('simulation_ended', gameState.metrics);
+        }
+    }
+}, 1000);
+
+// Slow Loop: Role Rotation (Runs every 120 seconds)
+setInterval(() => {
     if (isGameRunning) {
         io.emit('role_swap_alert', { message: "Roles rotating in 5 seconds!" });
         setTimeout(rotateManagers, 5000); // Actually swap 5 seconds after warning
     }
 }, 120000);
 
-// Start server (Replit defaults to port 3000)
+// Start server
 http.listen(process.env.PORT || 3000, () => console.log('Smart Grid Simulation running!'));
