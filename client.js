@@ -14,6 +14,7 @@ const produceSlider = document.getElementById('produce-slider');
 const callHelpBtn = document.getElementById('call-help-btn');
 const myGroupSpan = document.getElementById('my-group');
 const smartControls = document.getElementById('smart-controls');
+const havocScoreSpan = document.getElementById('havoc-score');
 
 // Manager Elements
 const inboxList = document.getElementById('inbox-list');
@@ -29,7 +30,7 @@ const adminCurrentScenario = document.getElementById('admin-current-scenario');
 const scenarioTitle = document.getElementById('scenario-title');
 const timerDisplay = document.getElementById('timer');
 
-// Chat Modal Elements
+// Chat Modal Elements (Manager)
 const chatModal = document.getElementById('chat-modal');
 const chatUserIdSpan = document.getElementById('chat-user-id');
 const chatHistory = document.getElementById('chat-history');
@@ -38,16 +39,22 @@ const restorePowerBtn = document.getElementById('restore-power-btn');
 const closeChatBtn = document.getElementById('close-chat-btn');
 const diagButtons = document.querySelectorAll('.diag-btn');
 
+// Chat Modal Elements (Consumer)
+const consumerChatModal = document.getElementById('consumer-chat-modal');
+const consumerIncomingQuestion = document.getElementById('consumer-incoming-question');
+const consumerReplyBtn = document.getElementById('consumer-reply-btn');
+const consumerReplyText = document.getElementById('consumer-reply-text');
+
 // Local State Variables
 let myRole = 'consumer';
 let myGroup = 1;
 let isPowered = true;
 let currentScenario = 1;
 let currentChatTargetId = null;
+let currentChatManagerId = null;
 let diagnosticProgress = 0;
 
 // --- 1. Admin Unlock Logic ---
-// We run this first so it appears even if sockets fail!
 const urlParams = new URLSearchParams(window.location.search);
 if (urlParams.get('admin') === 'true') {
     if(adminPanel) adminPanel.classList.remove('hidden');
@@ -124,6 +131,10 @@ socket.on('power_restored', () => {
     }
 });
 
+socket.on('update_havoc', (score) => {
+    if (havocScoreSpan) havocScoreSpan.innerText = score;
+});
+
 // --- 5. Manager Actions ---
 socket.on('new_ticket', (ticketData) => {
     if (myRole === 'manager') {
@@ -187,7 +198,7 @@ socket.on('predictive_alert', (data) => {
     }
 });
 
-// --- 6. Chat Modal Logic ---
+// --- 6. Chat Modal Logic (Manager) ---
 function openChatModal(targetId) {
     currentChatTargetId = targetId;
     chatUserIdSpan.innerText = `User ${targetId.substring(0,4)}`;
@@ -209,6 +220,23 @@ closeChatBtn.addEventListener('click', () => {
     chatModal.classList.add('hidden');
 });
 
+// Manager receives the reply from the consumer
+socket.on('incoming_reply', (data) => {
+    if (myRole === 'manager') {
+        chatHistory.innerHTML += `<div class="text-white"><b>Consumer:</b> ${data.answer}</div>`;
+        chatHistory.scrollTop = chatHistory.scrollHeight;
+        
+        diagnosticProgress += 25;
+        resolutionBar.style.width = `${diagnosticProgress}%`;
+
+        if (diagnosticProgress >= 100) {
+            restorePowerBtn.disabled = false;
+            restorePowerBtn.innerText = "RESTORE POWER TO USER";
+        }
+    }
+});
+
+// Manager asks a question
 diagButtons.forEach(btn => {
     btn.addEventListener('click', (e) => {
         const question = e.target.getAttribute('data-q');
@@ -220,18 +248,11 @@ diagButtons.forEach(btn => {
         chatHistory.innerHTML += `<div class="text-blue-400 mt-2"><b>You:</b> ${question}</div>`;
         chatHistory.scrollTop = chatHistory.scrollHeight; 
 
-        setTimeout(() => {
-            chatHistory.innerHTML += `<div class="text-white"><b>Consumer:</b> ${answer}</div>`;
-            chatHistory.scrollTop = chatHistory.scrollHeight;
-            
-            diagnosticProgress += 25;
-            resolutionBar.style.width = `${diagnosticProgress}%`;
-
-            if (diagnosticProgress >= 100) {
-                restorePowerBtn.disabled = false;
-                restorePowerBtn.innerText = "RESTORE POWER TO USER";
-            }
-        }, 600);
+        socket.emit('manager_ask_question', { 
+            targetId: currentChatTargetId, 
+            question: question, 
+            answer: answer 
+        });
     });
 });
 
@@ -240,7 +261,27 @@ restorePowerBtn.addEventListener('click', () => {
     chatModal.classList.add('hidden');
 });
 
-// --- 7. Admin Commands & State Management ---
+// --- 7. Chat Modal Logic (Consumer) ---
+socket.on('incoming_question', (data) => {
+    if (myRole === 'consumer') {
+        currentChatManagerId = data.managerId;
+        consumerIncomingQuestion.innerText = `"${data.question}"`;
+        consumerReplyText.innerText = data.answerExpected;
+        
+        consumerChatModal.classList.remove('hidden');
+    }
+});
+
+consumerReplyBtn.addEventListener('click', () => {
+    socket.emit('consumer_send_reply', { 
+        managerId: currentChatManagerId, 
+        answer: consumerReplyText.innerText 
+    });
+    
+    consumerChatModal.classList.add('hidden');
+});
+
+// --- 8. Admin Commands & State Management ---
 btnStartScen1.addEventListener('click', () => socket.emit('admin_change_scenario', 1));
 btnStartScen2.addEventListener('click', () => socket.emit('admin_change_scenario', 2));
 btnReset.addEventListener('click', () => {
@@ -264,7 +305,7 @@ socket.on('scenario_changed', (newScenarioId) => {
     if (myRole === 'manager') managerView.classList.remove('hidden');
 });
 
-// --- 8. UI Updates (Bars & Clock & Results) ---
+// --- 9. UI Updates (Bars & Clock & Results) ---
 socket.on('state_update', (state) => {
     if (myRole === 'manager') {
         for (let i = 1; i <= 4; i++) {
@@ -275,7 +316,6 @@ socket.on('state_update', (state) => {
                 
                 bar.style.width = `${percentage}%`;
 
-                // Update colors based on stress
                 if (percentage > 90) bar.className = "bg-red-600 h-4 rounded transition-all";
                 else if (percentage > 75) bar.className = "bg-yellow-500 h-4 rounded transition-all";
                 else bar.className = "bg-blue-500 h-4 rounded transition-all";

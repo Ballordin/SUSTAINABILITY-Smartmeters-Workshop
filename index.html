@@ -30,6 +30,15 @@
     </header>
 
     <div id="consumer-view" class="hidden max-w-md mx-auto bg-gray-800 p-6 rounded-lg shadow-lg">
+        <div id="consumer-view" class="hidden max-w-md mx-auto bg-gray-800 p-6 rounded-lg shadow-lg">
+        
+        <div class="flex justify-between items-center mb-4">
+            <h2 class="text-2xl">Your Home (Node <span id="my-group"></span>)</h2>
+            <div class="bg-red-900 border border-red-500 text-red-200 px-3 py-1 rounded font-bold shadow">
+                Havoc: <span id="havoc-score">0</span>
+            </div>
+        </div>
+
         <h2 class="text-2xl mb-4">Your Home (Group <span id="my-group"></span>)</h2>
         <div class="flex items-center justify-center w-full h-32 bg-green-500 rounded-lg mb-4 text-2xl font-bold" id="power-status">
             POWER ON
@@ -105,7 +114,19 @@
             </button>
         </div>
     </div>
-
+    
+    <div id="consumer-chat-modal" class="hidden fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center p-4 z-50">
+        <div class="bg-gray-800 rounded-lg p-6 w-full max-w-md border-2 border-red-600 shadow-2xl text-center">
+            <h3 class="text-2xl font-bold text-red-500 mb-4">🚨 Dispatch is calling...</h3>
+            <p class="text-gray-300 mb-2">Grid Manager asks:</p>
+            <div id="consumer-incoming-question" class="text-blue-400 font-bold text-xl mb-6 p-4 bg-gray-900 rounded">
+                </div>
+            <button id="consumer-reply-btn" class="w-full bg-blue-600 hover:bg-blue-500 p-4 rounded font-bold text-white text-lg transition-transform active:scale-95">
+                Reply: <span id="consumer-reply-text"></span>
+            </button>
+        </div>
+    </div>
+    
     <script src="client.js"></script>
 </body>
 </html>

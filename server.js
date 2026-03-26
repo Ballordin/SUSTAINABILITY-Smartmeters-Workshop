@@ -87,6 +87,21 @@ io.on('connection', (socket) => {
         delete gameState.users[socket.id];
         gameState.managers = gameState.managers.filter(id => id !== socket.id);
     });
+
+    // --- Interactive Chat Routing ---
+    socket.on('manager_ask_question', (data) => {
+        // Send the question to the specific consumer, and tell them who asked it
+        io.to(data.targetId).emit('incoming_question', { 
+            managerId: socket.id, 
+            question: data.question, 
+            answerExpected: data.answer 
+        });
+    });
+
+    socket.on('consumer_send_reply', (data) => {
+        // Route the reply back to the specific manager
+        io.to(data.managerId).emit('incoming_reply', { answer: data.answer });
+    });
 });
 
 // --- HELPER FUNCTIONS ---
@@ -98,7 +113,7 @@ function assignRoleAndGroup(socket) {
     if (role === 'manager') gameState.managers.push(socket.id);
 
     gameState.users[socket.id] = {
-        role: role, group: groupNum, consumption: 0, production: 0, volatility: 0
+        role: role, group: groupNum, consumption: 0, production: 0, volatility: 0, havoc: 0
     };
 
     socket.emit('role_assigned', { role: role, group: groupNum, scenario: gameState.scenario });
@@ -190,6 +205,13 @@ function checkOutages() {
                     io.to(victimId).emit('outage_event');
                     gameState.users[victimId].consumption = 0;
                     gameState.metrics.outages++;
+                    // (Inside the volatility check > 25)
+                    user.havoc += 10; // +10 points for blowing personal fuse
+                    io.to(id).emit('update_havoc', user.havoc);
+
+                    // ... later, inside the Substation Overload check (loadPercentage > 1.0) ...
+                    gameState.users[victimId].havoc += 50; // +50 points for crashing the whole neighborhood!
+                    io.to(victimId).emit('update_havoc', gameState.users[victimId].havoc);
 
                     if (gameState.scenario === 2) {
                         gameState.managers.forEach(mgrId => {
@@ -256,7 +278,7 @@ setInterval(() => {
         io.emit('role_swap_alert', { message: "Roles rotating in 5 seconds!" });
         setTimeout(rotateManagers, 5000); // Actually swap 5 seconds after warning
     }
-}, 90000);
+}, 120000);
 
 // Start server (Replit defaults to port 3000)
 http.listen(process.env.PORT || 3000, () => console.log('Smart Grid Simulation running!'));
