@@ -127,7 +127,7 @@ function assignRoleAndGroup(socket) {
 
     socket.emit('role_assigned', { role: role, group: groupNum, scenario: gameState.scenario });
 
-    // NEW FIX: Instantly sync the clock for latecomers!
+    // NEW FIX: Instantly sync the clock for the late consumer!
     let mins = Math.floor(timerSeconds / 60);
     let secs = timerSeconds % 60;
     socket.emit('time_update', `${mins}:${secs < 10 ? '0' : ''}${secs}`);
@@ -144,6 +144,26 @@ function resetGameMetrics() {
 }
 
 // --- GAME LOOP MECHANICS ---
+
+function assignConsumerTasks() {
+    const tasks = [
+        { name: "Cooking Dinner", min: 60, max: 80 },
+        { name: "Watching TV", min: 10, max: 30 },
+        { name: "Doing Laundry", min: 70, max: 90 },
+        { name: "Charging EV", min: 80, max: 100 },
+        { name: "Reading (Lights Only)", min: 5, max: 15 }
+    ];
+
+    for (const id in gameState.users) {
+        let user = gameState.users[id];
+        // 30% chance every few seconds to get a new task if they don't have one, and ONLY if they have power
+        if (user.role === 'consumer' && !user.currentTask && user.consumption > 0 && Math.random() < 0.3) {
+            user.currentTask = tasks[Math.random() * tasks.length | 0];
+            user.taskProgress = 0;
+            io.to(id).emit('new_task', user.currentTask);
+        }
+    }
+}
 
 function calculateGridLoad() {
     // Reset load counters
@@ -288,6 +308,37 @@ setInterval(() => {
 
 // Slow Loop: Role Rotation (90 seconds)
 setInterval(() => {
+    if (isGameRunning) {
+        calculateGridLoad();
+        checkOutages();
+        assignConsumerTasks(); // <-- ADD THIS
+
+        // NEW: Check Task Progress
+        for (const id in gameState.users) {
+            let user = gameState.users[id];
+            if (user.role === 'consumer' && user.currentTask) {
+                // Check if slider is in the target zone AND they have power
+                if (user.consumption >= user.currentTask.min && user.consumption <= user.currentTask.max && user.consumption > 0) {
+                    user.taskProgress += 10; // Takes 10 seconds to complete
+                    io.to(id).emit('task_progress', user.taskProgress);
+
+                    if (user.taskProgress >= 100) {
+                        user.compliance += 10; // Reward them!
+                        user.currentTask = null; // Clear task
+                        io.to(id).emit('task_completed', user.compliance);
+                    }
+                } else {
+                    // Penalty for dropping out of the zone
+                    if (user.taskProgress > 0) {
+                        user.taskProgress = 0;
+                        io.to(id).emit('task_progress', 0);
+                    }
+                }
+            }
+        }
+
+        io.emit('state_update', gameState);
+        
     if (isGameRunning) {
         io.emit('role_swap_alert', { message: "Roles rotating in 5 seconds!" });
         setTimeout(rotateManagers, 5000); // Actually swap 5 seconds after warning
