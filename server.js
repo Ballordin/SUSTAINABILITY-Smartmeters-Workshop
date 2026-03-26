@@ -1,10 +1,19 @@
 const express = require('express');
 const app = express();
 const http = require('http').createServer(app);
-const io = require('socket.io')(http);
+const path = require('path');
+const io = require('socket.io')(http,{
+    cors: { origin:"*"}
+}
+);
 
 // Serve the frontend files
 app.use(express.static(__dirname));
+
+// NEW: Forcefully serve index.html when someone visits the main URL
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'index.html'));
+});
 
 // The Game State
 let gameState = {
