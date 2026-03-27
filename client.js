@@ -84,17 +84,47 @@ socket.on('role_assigned', (data) => {
 });
 
 // --- 3. Consumer Actions ---
+let lastConsumeSend = 0;
+let lastProduceSend = 0;
+const THROTTLE_MS = 250; // Only send data 4 times a second max
+
+// Consume Slider (Continuous dragging)
 consumeSlider.addEventListener('input', (e) => {
-    if (isPowered) {
-        socket.emit('update_slider', { type: 'consume', value: e.target.value });
-    } else {
+    if (!isPowered) {
         e.target.value = 0;
+        return;
+    }
+    
+    const now = Date.now();
+    if (now - lastConsumeSend > THROTTLE_MS) {
+        socket.emit('update_slider', { type: 'consume', value: e.target.value });
+        lastConsumeSend = now;
     }
 });
 
+// Guarantee the absolute final resting value is sent when they let go of the mouse/screen
+consumeSlider.addEventListener('change', (e) => {
+    if (isPowered) {
+        socket.emit('update_slider', { type: 'consume', value: e.target.value });
+        lastConsumeSend = Date.now();
+    }
+});
+
+// Produce Slider (Scenario 2)
 produceSlider.addEventListener('input', (e) => {
+    if (currentScenario !== 2) return;
+    
+    const now = Date.now();
+    if (now - lastProduceSend > THROTTLE_MS) {
+        socket.emit('update_slider', { type: 'produce', value: e.target.value });
+        lastProduceSend = now;
+    }
+});
+
+produceSlider.addEventListener('change', (e) => {
     if (currentScenario === 2) {
         socket.emit('update_slider', { type: 'produce', value: e.target.value });
+        lastProduceSend = Date.now();
     }
 });
 
