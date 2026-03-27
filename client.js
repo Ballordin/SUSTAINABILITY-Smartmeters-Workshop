@@ -228,11 +228,17 @@ socket.on('predictive_alert', (data) => {
     }
 });
 
-// --- 6. Chat Modal Logic (Manager) ---
+/// --- 6. Chat Modal Logic (Manager) ---
+let isWaitingForReply = false;
+let chatTimeout; // Failsafe if consumer ignores them
+
 function openChatModal(targetId) {
     currentChatTargetId = targetId;
     chatUserIdSpan.innerText = `User ${targetId.substring(0,4)}`;
     diagnosticProgress = 0;
+    isWaitingForReply = false; 
+    clearTimeout(chatTimeout);
+    
     resolutionBar.style.width = '0%';
     chatHistory.innerHTML = '<div class="text-gray-400 italic">Connection established with consumer...</div>';
     
@@ -253,6 +259,9 @@ closeChatBtn.addEventListener('click', () => {
 // Manager receives the reply from the consumer
 socket.on('incoming_reply', (data) => {
     if (myRole === 'manager') {
+        isWaitingForReply = false; // UNLOCK!
+        clearTimeout(chatTimeout); // Clear the failsafe
+
         chatHistory.innerHTML += `<div class="text-white"><b>Consumer:</b> ${data.answer}</div>`;
         chatHistory.scrollTop = chatHistory.scrollHeight;
         
@@ -269,14 +278,35 @@ socket.on('incoming_reply', (data) => {
 // Manager asks a question
 diagButtons.forEach(btn => {
     btn.addEventListener('click', (e) => {
-        const question = e.target.getAttribute('data-q');
-        const answer = e.target.getAttribute('data-a');
+        if (isWaitingForReply) return; // Prevent speed-clicking!
+
+        const targetBtn = e.currentTarget;
+        const question = targetBtn.getAttribute('data-q');
+        const answer = targetBtn.getAttribute('data-a');
         
-        e.target.disabled = true;
-        e.target.classList.add('opacity-50', 'cursor-not-allowed');
+        targetBtn.disabled = true;
+        targetBtn.classList.add('opacity-50', 'cursor-not-allowed');
 
         chatHistory.innerHTML += `<div class="text-blue-400 mt-2"><b>You:</b> ${question}</div>`;
         chatHistory.scrollTop = chatHistory.scrollHeight; 
+
+        isWaitingForReply = true; // LOCK!
+
+        // 10-Second Failsafe (If consumer ignores the chat)
+        chatTimeout = setTimeout(() => {
+            if (isWaitingForReply) {
+                isWaitingForReply = false;
+                chatHistory.innerHTML += `<div class="text-gray-500 italic"><b>System:</b> Consumer unresponsive. Auto-diagnosing...</div>`;
+                chatHistory.scrollTop = chatHistory.scrollHeight;
+                
+                diagnosticProgress += 25;
+                resolutionBar.style.width = `${diagnosticProgress}%`;
+                if (diagnosticProgress >= 100) {
+                    restorePowerBtn.disabled = false;
+                    restorePowerBtn.innerText = "RESTORE POWER TO USER";
+                }
+            }
+        }, 10000);
 
         socket.emit('manager_ask_question', { 
             targetId: currentChatTargetId, 
@@ -385,4 +415,54 @@ socket.on('simulation_ended', (finalMetrics) => {
             plugins: { legend: { display: false } }
         }
     });
+});
+
+// --- 10. Consumer Goals & Tasks ---
+const consumerTaskBox = document.getElementById('consumer-task-box');
+const taskNameSpan = document.getElementById('task-name');
+const taskTargetSpan = document.getElementById('task-target');
+const taskProgressBar = document.getElementById('task-progress');
+const complianceScoreSpan = document.getElementById('compliance-score');
+
+// When the server gives this specific consumer a new task
+socket.on('new_task', (task) => {
+    if (myRole === 'consumer') {
+        // Unhide the task box and populate the text
+        consumerTaskBox.classList.remove('hidden');
+        taskNameSpan.innerText = task.name;
+        taskTargetSpan.innerText = `${task.min}% - ${task.max}%`;
+        taskProgressBar.style.width = '0%';
+    }
+});
+
+// Animate the progress bar as they hold the slider in the correct zone
+socket.on('task_progress', (progress) => {
+    if (myRole === 'consumer') {
+        taskProgressBar.style.width = `${progress}%`;
+        
+        // Change color dynamically based on progress
+        if (progress > 0) {
+            taskProgressBar.classList.replace('bg-green-500', 'bg-blue-400');
+        } else {
+            taskProgressBar.classList.replace('bg-blue-400', 'bg-green-500');
+        }
+    }
+});
+
+// When they successfully hold it for 10 seconds
+socket.on('task_completed', (newScore) => {
+    if (myRole === 'consumer') {
+        // Hide the box until the server gives them a new one
+        consumerTaskBox.classList.add('hidden');
+        
+        // Update their score
+        if (complianceScoreSpan) complianceScoreSpan.innerText = newScore;
+        
+        // Add a quick flash animation to the badge so they know they got points!
+        const badge = complianceScoreSpan.parentElement;
+        badge.classList.add('bg-green-500', 'text-white');
+        setTimeout(() => {
+            badge.classList.remove('bg-green-500', 'text-white');
+        }, 500);
+    }
 });
