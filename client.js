@@ -60,6 +60,8 @@ if (urlParams.get('admin') === 'true') {
     if(adminPanel) adminPanel.classList.remove('hidden');
 }
 
+socket.emit('register_user', { isAdmin: isAdmin });
+
 // --- 2. Initial Setup & Role Assignment ---
 socket.on('role_assigned', (data) => {
     myRole = data.role;

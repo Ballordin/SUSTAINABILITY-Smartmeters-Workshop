@@ -36,8 +36,18 @@ let isGameRunning = false;
 io.on('connection', (socket) => {
     console.log('User connected:', socket.id);
     
-    // 1. Assign Role & Group
-    assignRoleAndGroup(socket);
+    // 1. Register User (Player vs Admin)
+    socket.on('register_user', (data) => {
+        if (data.isAdmin) {
+            // Give Admin the clock, but NO role and NO group
+            let mins = Math.floor(timerSeconds / 60);
+            let secs = timerSeconds % 60;
+            socket.emit('time_update', `${mins}:${secs < 10 ? '0' : ''}${secs}`);
+        } else {
+            // Assign normal students their homes
+            assignRoleAndGroup(socket);
+        }
+    });
 
     // 2. Listen for slider updates (Consumption AND Production)
     socket.on('update_slider', (data) => {
