@@ -49,16 +49,22 @@ io.on('connection', (socket) => {
         }
     });
 
-    // 2. Listen for slider updates (Consumption AND Production)
+    // 2. Listen for slider updates
     socket.on('update_slider', (data) => {
         let user = gameState.users[socket.id];
         if (!user) return;
 
         if (data.type === 'consume') {
-            // Volatility math
             let change = Math.abs(user.consumption - data.value);
             user.volatility = (user.volatility + change) / 2;
             user.consumption = parseInt(data.value);
+
+            // NEW ENGAGEMENT MECHANIC: Instant Havoc for jerking the slider!
+            if (change > 5) { 
+                user.havoc += Math.floor(change / 3); // Gives 1 to 30 points instantly based on how hard they jerked it
+                io.to(socket.id).emit('update_havoc', user.havoc);
+            }
+
         } else if (data.type === 'produce') {
             user.production = parseInt(data.value);
         }

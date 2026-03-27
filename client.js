@@ -458,8 +458,9 @@ socket.on('task_completed', (newScore) => {
         consumerTaskBox.classList.add('hidden');
         
         // Update their score
-        if (complianceScoreSpan) complianceScoreSpan.innerText = newScore;
-        
+        if (complianceScoreSpan) {
+            complianceScoreSpan.innerText = newScore !== undefined ? newScore : 0;
+        }
         // Add a quick flash animation to the badge so they know they got points!
         const badge = complianceScoreSpan.parentElement;
         badge.classList.add('bg-green-500', 'text-white');
