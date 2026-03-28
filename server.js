@@ -7,12 +7,12 @@ const io = require('socket.io')(http,{
 }
 );
 
-// Serve the frontend files
-app.use(express.static(__dirname));
+// Serve ONLY the files inside the "public" folder to the browser
+app.use(express.static(path.join(__dirname, 'public')));
 
-// NEW: Forcefully serve index.html when someone visits the main URL
+// Forcefully serve index.html from the public folder
 app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 // The Game State
