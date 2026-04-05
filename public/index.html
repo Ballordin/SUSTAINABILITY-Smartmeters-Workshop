@@ -3,147 +3,513 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Smart Grid Simulation</title>
-    
+    <title>Smart Grid Workshop</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .mono { font-family: 'JetBrains Mono', monospace; }
+
+        /* Animations */
+        @keyframes blackout-pulse { 0%,100%{background:#991b1b} 50%{background:#450a0a} }
+        @keyframes slide-in-right { from{transform:translateX(110%);opacity:0} to{transform:translateX(0);opacity:1} }
+        @keyframes slide-in-down { from{transform:translateY(-20px);opacity:0} to{transform:translateY(0);opacity:1} }
+        @keyframes glow-pulse { 0%,100%{box-shadow:0 0 8px rgba(34,197,94,0.4)} 50%{box-shadow:0 0 20px rgba(34,197,94,0.9)} }
+        @keyframes warning-flash { 0%,100%{border-color:#f59e0b} 50%{border-color:#fbbf24} }
+        @keyframes spin-slow { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+
+        .blackout-anim { animation: blackout-pulse 0.7s infinite; }
+        .slide-right   { animation: slide-in-right 0.35s ease-out; }
+        .slide-down    { animation: slide-in-down 0.3s ease-out; }
+        .glow-green    { animation: glow-pulse 2s infinite; }
+        .warn-flash    { animation: warning-flash 1.2s infinite; }
+
+        /* Appliance cards */
+        .appliance-btn {
+            transition: all 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
+            cursor: pointer;
+        }
+        .appliance-btn:hover { transform: scale(1.04); }
+        .appliance-btn:active { transform: scale(0.96); }
+        .appliance-btn.on { transform: scale(1.06); }
+
+        /* Node cards */
+        .node-card { transition: border-color 0.4s, box-shadow 0.4s; }
+        .node-card.warn  { border-color: #f59e0b !important; box-shadow: 0 0 12px rgba(245,158,11,0.3); }
+        .node-card.crit  { border-color: #ef4444 !important; box-shadow: 0 0 16px rgba(239,68,68,0.4); animation: warning-flash 1s infinite; }
+        .node-card.shed  { border-color: #a855f7 !important; box-shadow: 0 0 12px rgba(168,85,247,0.3); }
+
+        /* Progress bars */
+        .load-bar { transition: width 0.4s ease, background-color 0.4s; }
+
+        /* Price badge */
+        .price-badge { transition: all 0.5s; }
+
+        /* Scrollbars */
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: #111827; }
+        ::-webkit-scrollbar-thumb { background: #374151; border-radius: 2px; }
+
+        /* Toast */
+        #toast { transition: opacity 0.3s; }
+    </style>
 </head>
+<body class="bg-gray-950 text-white min-h-screen">
 
-<body class="bg-gray-900 text-white font-sans p-6">
-
-    <div id="admin-panel" class="hidden max-w-4xl mx-auto bg-purple-900 p-4 rounded-lg shadow-lg mb-6 border-2 border-purple-500 flex justify-between items-center">
+<!-- ═══════════════ ADMIN PANEL ═══════════════ -->
+<div id="admin-panel" class="hidden bg-purple-950 border-b-2 border-purple-700 px-6 py-3">
+    <div class="max-w-6xl mx-auto flex flex-wrap items-center justify-between gap-3">
         <div>
-            <h2 class="text-xl font-bold text-white">Instructor Controls</h2>
-            <p class="text-sm text-purple-200">Current: <span id="admin-current-scenario">Scenario 1</span></p>
+            <span class="text-purple-300 text-xs font-bold uppercase tracking-widest">🎓 Instructor Console</span>
+            <p class="text-white text-sm mt-0.5">Active: <span id="admin-current-scenario" class="font-bold text-purple-200">Scenario 1 — Legacy Grid</span></p>
         </div>
-        <div class="space-x-2">
-            <button id="btn-start-scen1" class="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded font-bold">Load Scenario 1</button>
-            <button id="btn-start-scen2" class="bg-blue-600 hover:bg-blue-500 px-4 py-2 rounded font-bold">Load Scenario 2</button>
-            <button id="btn-reset" class="bg-red-600 hover:bg-red-500 px-4 py-2 rounded font-bold">Reset Data</button>
+        <div class="flex flex-wrap gap-2 items-center">
+            <button id="btn-start-scen1" class="bg-gray-700 hover:bg-gray-600 border border-gray-600 px-4 py-1.5 rounded-lg font-bold text-sm transition-colors">⚡ Scenario 1</button>
+            <button id="btn-start-scen2" class="bg-blue-700 hover:bg-blue-600 border border-blue-500 px-4 py-1.5 rounded-lg font-bold text-sm transition-colors">🤖 Scenario 2</button>
+            <div class="w-px h-6 bg-purple-700 mx-1"></div>
+            <span class="text-purple-400 text-xs font-bold uppercase">Events:</span>
+            <select id="admin-group-select" class="bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-xs mono">
+                <option value="">All Nodes</option>
+                <option value="1">Node 1</option>
+                <option value="2">Node 2</option>
+                <option value="3">Node 3</option>
+                <option value="4">Node 4</option>
+            </select>
+            <button id="btn-inject-surge" class="bg-yellow-800 hover:bg-yellow-700 border border-yellow-700 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors">⚡ Surge</button>
+            <button id="btn-inject-dr"    class="bg-green-800 hover:bg-green-700 border border-green-700 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors">📡 Demand Response</button>
+            <button id="btn-inject-price" class="bg-red-800 hover:bg-red-700 border border-red-700 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors">💰 Price Spike</button>
+            <div class="w-px h-6 bg-purple-700 mx-1"></div>
+            <button id="btn-reset" class="bg-red-900 hover:bg-red-800 border border-red-700 px-4 py-1.5 rounded-lg font-bold text-sm transition-colors">↺ Reset</button>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════════ HEADER ═══════════════ -->
+<header class="border-b border-gray-800 px-6 py-4">
+    <div class="max-w-6xl mx-auto flex justify-between items-center">
+        <div>
+            <h1 id="scenario-title" class="text-2xl font-black tracking-tight text-white">
+                Scenario 1: <span class="text-blue-400">Legacy Grid</span>
+            </h1>
+            <p class="text-gray-500 text-xs mt-0.5">Smart Grid Workshop — Porto University</p>
+        </div>
+        <div class="text-right">
+            <p id="timer" class="mono text-2xl font-bold text-yellow-400">10:00</p>
+            <p class="text-gray-600 text-xs">time remaining</p>
+        </div>
+    </div>
+</header>
+
+<!-- ═══════════════════════════════════════════════════════════
+     CONSUMER VIEW
+════════════════════════════════════════════════════════════ -->
+<div id="consumer-view" class="hidden max-w-lg mx-auto px-4 pt-5 pb-10">
+
+    <!-- Task challenge box -->
+    <div id="consumer-task-box" class="hidden bg-blue-950 border border-blue-700 rounded-xl p-4 mb-4 slide-down">
+        <div class="flex items-center gap-2 mb-2">
+            <span class="text-blue-400 text-xs font-bold uppercase tracking-widest">🎯 Active Challenge</span>
+            <div class="flex-1 h-px bg-blue-800"></div>
+        </div>
+        <p id="task-name" class="text-white font-bold text-lg mb-1">–</p>
+        <p class="text-sm text-gray-400">Keep usage between <span id="task-target" class="text-yellow-400 font-bold mono">–</span></p>
+        <div class="mt-3 bg-gray-900 rounded-full h-2.5 border border-blue-900 overflow-hidden">
+            <div id="task-progress" class="bg-blue-400 h-2.5 rounded-full transition-all duration-300" style="width:0%"></div>
+        </div>
+        <p class="text-xs text-gray-600 mt-1 text-right">Hold steady in the range to fill the bar</p>
+    </div>
+
+    <!-- Score row -->
+    <div class="flex justify-between items-center mb-4">
+        <div>
+            <p class="text-gray-500 text-xs uppercase tracking-wider">Your Home</p>
+            <h2 class="text-xl font-black">Node <span id="my-group" class="text-blue-400">–</span></h2>
+        </div>
+        <div class="flex gap-2">
+            <div class="bg-green-950 border border-green-800 text-green-300 px-3 py-1.5 rounded-lg mono text-sm font-bold">✅ <span id="compliance-score">0</span></div>
+            <div class="bg-red-950 border border-red-800 text-red-300 px-3 py-1.5 rounded-lg mono text-sm font-bold">🔥 <span id="havoc-score">0</span></div>
         </div>
     </div>
 
-    <header class="text-center mb-8">
-        <h1 class="text-3xl font-bold text-blue-400" id="scenario-title">Scenario 1: Legacy Grid</h1>
-        <p id="timer" class="text-xl text-yellow-400 font-mono mt-2">Time Remaining: 10:00</p>
-    </header>
+    <!-- Power status banner -->
+    <div id="power-status" class="glow-green flex items-center justify-center gap-3 w-full py-4 bg-green-900 border border-green-700 rounded-xl mb-5 text-xl font-black shadow-lg">
+        <span id="power-dot" class="w-3 h-3 rounded-full bg-green-400 shadow shadow-green-400"></span>
+        <span id="power-label">POWER ON</span>
+    </div>
 
-    <div id="consumer-view" class="hidden max-w-md mx-auto bg-gray-800 p-6 rounded-lg shadow-lg border border-gray-700">
-        <div id="consumer-task-box" class="bg-blue-900 border border-blue-500 rounded p-4 mb-4 shadow text-center hidden">
-            <p class="text-blue-200 text-sm font-bold uppercase tracking-wider mb-1">Current Task</p>
-            <h3 id="task-name" class="text-xl font-bold text-white mb-2">Waiting for task...</h3>
-            <p class="text-sm text-gray-300">Target: <span id="task-target" class="font-bold text-yellow-400">0% - 0%</span></p>
-            
-            <div class="w-full bg-blue-950 rounded-full h-2 mt-3 border border-blue-700">
-                <div id="task-progress" class="bg-green-500 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+    <!-- ─── SCENARIO 1 consumer panel ─────────────────────────────── -->
+    <div id="s1-consumer">
+
+        <p class="text-gray-500 text-sm text-center mb-4">
+            Turn appliances <strong class="text-white">on/off</strong> to manage your home's electricity use.
+            <br>Be careful — too much load trips the grid!
+        </p>
+
+        <!-- Appliance grid -->
+        <div id="appliance-grid" class="grid grid-cols-3 gap-3 mb-5"></div>
+
+        <!-- Total usage meter -->
+        <div class="bg-gray-900 border border-gray-700 rounded-xl p-4 mb-5">
+            <div class="flex justify-between text-sm mb-2">
+                <span class="text-gray-400 font-semibold">Total Draw</span>
+                <span id="total-watts" class="mono font-bold text-white">0 W</span>
+                <span id="s1-cost" class="text-yellow-400 mono font-bold">€0.000/h</span>
+            </div>
+            <div class="bg-gray-800 rounded-full h-4 overflow-hidden border border-gray-700">
+                <div id="usage-bar" class="load-bar h-4 rounded-full bg-green-500" style="width:0%"></div>
+            </div>
+            <div class="flex justify-between text-xs text-gray-700 mt-1.5">
+                <span>0 W</span><span class="text-red-700">▲ Danger zone</span><span>3450 W</span>
             </div>
         </div>
 
-        <div class="flex justify-between items-center mb-4">
-            <h2 class="text-2xl">Your Home (Node <span id="my-group"></span>)</h2>
-            <div class="flex space-x-2">
-                <div class="bg-green-900 border border-green-500 text-green-200 px-3 py-1 rounded font-bold shadow">
-                    Good: <span id="compliance-score">0</span>
-                </div>
-                <div class="bg-red-900 border border-red-500 text-red-200 px-3 py-1 rounded font-bold shadow">
-                    Havoc: <span id="havoc-score">0</span>
-                </div>
-            </div>
-        </div>
-
-        <div class="flex items-center justify-center w-full h-32 bg-green-500 rounded-lg mb-4 text-2xl font-bold shadow-inner transition-colors duration-300" id="power-status">
-            POWER ON
-        </div>
-        
-        <label class="block mb-2 font-semibold text-gray-300">Power Consumption</label>
-        <input type="range" id="consume-slider" min="0" max="100" value="0" class="w-full mb-6 cursor-pointer">
-        
-        <div id="smart-controls" class="hidden mb-6 bg-gray-700 p-4 rounded-lg border border-yellow-600">
-            <label class="block mb-2 font-semibold text-yellow-400">☀️ Solar Production</label>
-            <input type="range" id="produce-slider" min="0" max="100" value="0" class="w-full cursor-pointer">
-        </div>
-
-        <button id="call-help-btn" class="w-full bg-red-600 hover:bg-red-500 p-4 rounded font-bold hidden text-white shadow-lg transition-transform active:scale-95 text-lg">
-            CALL GRID MANAGER
+        <!-- Call help button (only shown during blackout) -->
+        <button id="call-help-btn" class="hidden w-full bg-red-700 hover:bg-red-600 active:scale-95 border border-red-500 py-4 rounded-xl font-black text-lg shadow-lg transition-all">
+            📞 CALL GRID MANAGER
         </button>
     </div>
 
-    <div id="manager-view" class="hidden grid grid-cols-2 gap-6 max-w-6xl mx-auto">
-        
-        <div id="predictive-routing-panel" class="col-span-2 bg-gray-800 p-6 rounded-lg hidden border border-yellow-500 mt-4 shadow-lg">
-            <h2 class="text-2xl mb-4 text-yellow-400 font-bold">⚠️ Predictive Load Routing</h2>
-            <div id="routing-suggestions" class="space-y-2">
-                </div>
-        </div>
+    <!-- ─── SCENARIO 2 consumer panel ─────────────────────────────── -->
+    <div id="s2-consumer" class="hidden">
 
-        <div class="bg-gray-800 p-6 rounded-lg border border-gray-700 shadow-lg">
-            <h2 class="text-2xl mb-4 text-blue-400 font-bold">Substation Load</h2>
-            <div id="substation-bars" class="space-y-6">
-                <div><span class="font-bold text-gray-300">Node 1</span> <div class="w-full bg-gray-900 h-6 rounded border border-gray-600 mt-1"><div id="load-bar-1" class="bg-blue-500 h-6 rounded transition-all duration-300" style="width: 0%"></div></div></div>
-                <div><span class="font-bold text-gray-300">Node 2</span> <div class="w-full bg-gray-900 h-6 rounded border border-gray-600 mt-1"><div id="load-bar-2" class="bg-blue-500 h-6 rounded transition-all duration-300" style="width: 0%"></div></div></div>
-                <div><span class="font-bold text-gray-300">Node 3</span> <div class="w-full bg-gray-900 h-6 rounded border border-gray-600 mt-1"><div id="load-bar-3" class="bg-blue-500 h-6 rounded transition-all duration-300" style="width: 0%"></div></div></div>
-                <div><span class="font-bold text-gray-300">Node 4</span> <div class="w-full bg-gray-900 h-6 rounded border border-gray-600 mt-1"><div id="load-bar-4" class="bg-blue-500 h-6 rounded transition-all duration-300" style="width: 0%"></div></div></div>
+        <!-- Electricity price ticker -->
+        <div class="bg-gray-900 border border-gray-700 rounded-xl p-4 mb-4 flex items-center justify-between">
+            <div>
+                <p class="text-xs text-gray-500 uppercase tracking-wider mb-1">Live Price</p>
+                <div class="flex items-center gap-3">
+                    <span id="price-tier-badge" class="price-badge px-3 py-1 rounded-full text-sm font-black bg-yellow-500 text-black">🌤 Normal</span>
+                    <span id="price-value" class="mono text-3xl font-black">€0.15</span>
+                    <span class="text-gray-600 text-sm">/kWh</span>
+                </div>
+            </div>
+            <div class="text-right">
+                <p class="text-xs text-gray-500">Your cost now</p>
+                <p id="s2-cost" class="mono text-xl font-bold text-yellow-400">€0.000/h</p>
             </div>
         </div>
 
-        <div class="bg-gray-800 p-6 rounded-lg border border-gray-700 shadow-lg">
-            <h2 class="text-2xl mb-4 text-red-400 font-bold">Inbox / Alerts</h2>
-            <div id="inbox-list" class="space-y-3 max-h-80 overflow-y-auto pr-2">
+        <!-- Demand response banner -->
+        <div id="dr-banner" class="hidden bg-orange-950 border-2 border-orange-500 rounded-xl p-4 mb-4 slide-down">
+            <div class="flex items-center gap-2 mb-2">
+                <span class="text-orange-300 text-xs font-black uppercase tracking-widest animate-pulse">⚡ Demand Response Alert</span>
+            </div>
+            <p class="text-white font-bold mb-3">Grid under stress! The operator asks you to <strong class="text-orange-300">reduce your load</strong> now.</p>
+            <p class="text-sm text-gray-400 mb-3">Accept and cut consumption → earn <span class="text-yellow-400 font-bold">+20 compliance pts</span></p>
+            <div class="flex gap-2">
+                <button id="dr-accept-btn" class="flex-1 bg-green-700 hover:bg-green-600 border border-green-500 py-2.5 rounded-lg font-black text-white transition-colors">✅ Accept — Reduce Load</button>
+                <button id="dr-ignore-btn" class="flex-1 bg-gray-800 hover:bg-gray-700 border border-gray-600 py-2.5 rounded-lg font-bold text-gray-400 text-sm transition-colors">Ignore</button>
+            </div>
+        </div>
+
+        <!-- Appliance grid (smart mode) -->
+        <p class="text-gray-500 text-sm text-center mb-3">
+            Toggle appliances. In the <strong class="text-blue-400">smart grid</strong>, your solar & battery offset your draw.
+        </p>
+        <div id="s2-appliance-grid" class="grid grid-cols-3 gap-3 mb-4"></div>
+
+        <!-- Solar + Battery row -->
+        <div class="grid grid-cols-2 gap-3 mb-4">
+            <div class="bg-gray-900 border border-yellow-800 rounded-xl p-4">
+                <p class="text-yellow-400 text-sm font-bold mb-2">☀️ Solar Output</p>
+                <input type="range" id="produce-slider" min="0" max="100" value="0" class="w-full accent-yellow-400 cursor-pointer">
+                <p class="text-xs text-gray-500 mt-2 text-center">
+                    <span id="solar-pct" class="mono text-yellow-400 font-bold">0</span>% →
+                    <span id="solar-watts" class="mono text-yellow-300 font-bold">0</span> W
+                </p>
+            </div>
+            <div class="bg-gray-900 border border-blue-800 rounded-xl p-4">
+                <div class="flex justify-between items-center mb-2">
+                    <p class="text-blue-400 text-sm font-bold">🔋 Battery</p>
+                    <span id="battery-pct" class="mono text-white text-sm font-bold">50%</span>
                 </div>
+                <div class="bg-gray-800 rounded-full h-3 overflow-hidden border border-gray-700 mb-2.5">
+                    <div id="battery-bar" class="load-bar h-3 rounded-full bg-blue-500" style="width:50%"></div>
+                </div>
+                <div class="grid grid-cols-3 gap-1">
+                    <button class="bat-btn py-1.5 rounded text-xs font-bold border border-gray-700 bg-gray-800 hover:bg-green-900 hover:border-green-700 transition-colors" data-mode="charge">⬆ Charge</button>
+                    <button class="bat-btn py-1.5 rounded text-xs font-bold border border-blue-700 bg-blue-950 transition-colors" data-mode="idle">Idle</button>
+                    <button class="bat-btn py-1.5 rounded text-xs font-bold border border-gray-700 bg-gray-800 hover:bg-yellow-900 hover:border-yellow-700 transition-colors" data-mode="discharge">⬇ Use</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Net import/export display -->
+        <div class="bg-gray-900 border border-gray-700 rounded-xl p-4 mb-4">
+            <div class="flex justify-between text-xs text-gray-500 mb-2">
+                <span>🔌 Importing from grid</span>
+                <span id="net-label" class="mono font-bold text-white">Net: 0 W</span>
+                <span>☀️ Exporting solar</span>
+            </div>
+            <div class="flex items-center gap-1">
+                <div class="flex-1 bg-gray-800 h-3 rounded-l-full overflow-hidden border border-gray-700">
+                    <div id="import-bar" class="h-3 rounded-l-full bg-red-500 float-right transition-all duration-300" style="width:0%"></div>
+                </div>
+                <div class="w-2 h-4 bg-gray-600 rounded-full mx-0.5"></div>
+                <div class="flex-1 bg-gray-800 h-3 rounded-r-full overflow-hidden border border-gray-700">
+                    <div id="export-bar" class="h-3 rounded-r-full bg-green-500 transition-all duration-300" style="width:0%"></div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+</div><!-- /consumer-view -->
+
+<!-- ═══════════════════════════════════════════════════════════
+     MANAGER VIEW
+════════════════════════════════════════════════════════════ -->
+<div id="manager-view" class="hidden max-w-6xl mx-auto px-4 pt-5 pb-10">
+
+    <div class="flex items-center justify-between mb-5">
+        <div>
+            <p class="text-gray-500 text-xs uppercase tracking-widest">Grid Control</p>
+            <h2 class="text-2xl font-black">⚡ Dispatch Centre</h2>
+        </div>
+        <div id="mgr-scenario-badge" class="bg-gray-800 border border-gray-600 px-4 py-1.5 rounded-full text-sm font-bold text-gray-300">Scenario 1</div>
+    </div>
+
+    <!-- Node cards (both scenarios) -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <!-- Node 1 -->
+        <div class="node-card bg-gray-900 border-2 border-gray-700 rounded-xl p-4 shadow-lg" id="node-card-1">
+            <div class="flex justify-between items-start mb-3">
+                <div>
+                    <p class="text-gray-500 text-xs uppercase tracking-wider">Node</p>
+                    <p class="text-2xl font-black">1</p>
+                </div>
+                <span class="node-badge text-xs font-bold px-2 py-1 rounded-lg bg-green-900 border border-green-800 text-green-300">Normal</span>
+            </div>
+            <div class="bg-gray-800 h-2.5 rounded-full overflow-hidden mb-1.5 border border-gray-700">
+                <div id="load-bar-1" class="load-bar h-2.5 rounded-full bg-green-500" style="width:0%"></div>
+            </div>
+            <div class="flex justify-between text-xs">
+                <span id="load-pct-1" class="mono text-gray-400">0%</span>
+                <span id="ticket-badge-1" class="hidden text-yellow-400 font-bold">🎫 0</span>
+            </div>
+            <button class="shed-btn mt-3 w-full hidden bg-red-950 hover:bg-red-900 border border-red-800 text-red-400 text-xs py-1.5 rounded-lg font-bold transition-colors" data-group="1">⚡ Shed Node</button>
+            <button class="reroute-btn mt-3 w-full hidden bg-blue-950 hover:bg-blue-900 border border-blue-800 text-blue-400 text-xs py-1.5 rounded-lg font-bold transition-colors" data-group="1">↔ Reroute</button>
+        </div>
+        <!-- Node 2 -->
+        <div class="node-card bg-gray-900 border-2 border-gray-700 rounded-xl p-4 shadow-lg" id="node-card-2">
+            <div class="flex justify-between items-start mb-3">
+                <div><p class="text-gray-500 text-xs uppercase tracking-wider">Node</p><p class="text-2xl font-black">2</p></div>
+                <span class="node-badge text-xs font-bold px-2 py-1 rounded-lg bg-green-900 border border-green-800 text-green-300">Normal</span>
+            </div>
+            <div class="bg-gray-800 h-2.5 rounded-full overflow-hidden mb-1.5 border border-gray-700">
+                <div id="load-bar-2" class="load-bar h-2.5 rounded-full bg-green-500" style="width:0%"></div>
+            </div>
+            <div class="flex justify-between text-xs">
+                <span id="load-pct-2" class="mono text-gray-400">0%</span>
+                <span id="ticket-badge-2" class="hidden text-yellow-400 font-bold">🎫 0</span>
+            </div>
+            <button class="shed-btn mt-3 w-full hidden bg-red-950 hover:bg-red-900 border border-red-800 text-red-400 text-xs py-1.5 rounded-lg font-bold transition-colors" data-group="2">⚡ Shed Node</button>
+            <button class="reroute-btn mt-3 w-full hidden bg-blue-950 hover:bg-blue-900 border border-blue-800 text-blue-400 text-xs py-1.5 rounded-lg font-bold transition-colors" data-group="2">↔ Reroute</button>
+        </div>
+        <!-- Node 3 -->
+        <div class="node-card bg-gray-900 border-2 border-gray-700 rounded-xl p-4 shadow-lg" id="node-card-3">
+            <div class="flex justify-between items-start mb-3">
+                <div><p class="text-gray-500 text-xs uppercase tracking-wider">Node</p><p class="text-2xl font-black">3</p></div>
+                <span class="node-badge text-xs font-bold px-2 py-1 rounded-lg bg-green-900 border border-green-800 text-green-300">Normal</span>
+            </div>
+            <div class="bg-gray-800 h-2.5 rounded-full overflow-hidden mb-1.5 border border-gray-700">
+                <div id="load-bar-3" class="load-bar h-2.5 rounded-full bg-green-500" style="width:0%"></div>
+            </div>
+            <div class="flex justify-between text-xs">
+                <span id="load-pct-3" class="mono text-gray-400">0%</span>
+                <span id="ticket-badge-3" class="hidden text-yellow-400 font-bold">🎫 0</span>
+            </div>
+            <button class="shed-btn mt-3 w-full hidden bg-red-950 hover:bg-red-900 border border-red-800 text-red-400 text-xs py-1.5 rounded-lg font-bold transition-colors" data-group="3">⚡ Shed Node</button>
+            <button class="reroute-btn mt-3 w-full hidden bg-blue-950 hover:bg-blue-900 border border-blue-800 text-blue-400 text-xs py-1.5 rounded-lg font-bold transition-colors" data-group="3">↔ Reroute</button>
+        </div>
+        <!-- Node 4 -->
+        <div class="node-card bg-gray-900 border-2 border-gray-700 rounded-xl p-4 shadow-lg" id="node-card-4">
+            <div class="flex justify-between items-start mb-3">
+                <div><p class="text-gray-500 text-xs uppercase tracking-wider">Node</p><p class="text-2xl font-black">4</p></div>
+                <span class="node-badge text-xs font-bold px-2 py-1 rounded-lg bg-green-900 border border-green-800 text-green-300">Normal</span>
+            </div>
+            <div class="bg-gray-800 h-2.5 rounded-full overflow-hidden mb-1.5 border border-gray-700">
+                <div id="load-bar-4" class="load-bar h-2.5 rounded-full bg-green-500" style="width:0%"></div>
+            </div>
+            <div class="flex justify-between text-xs">
+                <span id="load-pct-4" class="mono text-gray-400">0%</span>
+                <span id="ticket-badge-4" class="hidden text-yellow-400 font-bold">🎫 0</span>
+            </div>
+            <button class="shed-btn mt-3 w-full hidden bg-red-950 hover:bg-red-900 border border-red-800 text-red-400 text-xs py-1.5 rounded-lg font-bold transition-colors" data-group="4">⚡ Shed Node</button>
+            <button class="reroute-btn mt-3 w-full hidden bg-blue-950 hover:bg-blue-900 border border-blue-800 text-blue-400 text-xs py-1.5 rounded-lg font-bold transition-colors" data-group="4">↔ Reroute</button>
         </div>
     </div>
 
-    <div id="results-view" class="hidden max-w-4xl mx-auto bg-gray-800 p-8 rounded-lg border border-blue-500 shadow-2xl mt-8">
-        <h2 class="text-4xl mb-6 text-center font-bold text-white">Simulation Results</h2>
+    <!-- ─── SCENARIO 1 Manager panels ──────────────────────────── -->
+    <div id="s1-manager">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <!-- Inbox -->
+            <div class="bg-gray-900 border border-gray-700 rounded-xl p-5 shadow">
+                <div class="flex items-center gap-2 mb-4">
+                    <h3 class="font-black text-lg text-red-400">📋 Alert Inbox</h3>
+                    <span id="inbox-count" class="bg-red-900 border border-red-700 text-red-300 mono text-xs px-2 py-0.5 rounded-full">0</span>
+                </div>
+                <div id="inbox-list" class="space-y-3 max-h-72 overflow-y-auto pr-1"></div>
+                <p id="inbox-empty" class="text-gray-600 text-sm text-center py-6">✓ No active alerts</p>
+            </div>
+            <!-- Stats + Emergency controls -->
+            <div class="bg-gray-900 border border-gray-700 rounded-xl p-5 shadow">
+                <h3 class="font-black text-lg text-blue-400 mb-4">📊 Session Metrics</h3>
+                <div class="grid grid-cols-3 gap-3 mb-5">
+                    <div class="bg-gray-800 rounded-lg p-3 text-center border border-gray-700">
+                        <p class="mono text-2xl font-black text-red-400" id="stat-outages">0</p>
+                        <p class="text-xs text-gray-500 mt-1">Outages</p>
+                    </div>
+                    <div class="bg-gray-800 rounded-lg p-3 text-center border border-gray-700">
+                        <p class="mono text-2xl font-black text-yellow-400" id="stat-calls">0</p>
+                        <p class="text-xs text-gray-500 mt-1">Calls</p>
+                    </div>
+                    <div class="bg-gray-800 rounded-lg p-3 text-center border border-gray-700">
+                        <p class="mono text-2xl font-black text-green-400" id="stat-resolved">0</p>
+                        <p class="text-xs text-gray-500 mt-1">Resolved</p>
+                    </div>
+                </div>
+                <!-- Emergency load shed panel -->
+                <div class="bg-red-950 border border-red-900 rounded-lg p-4">
+                    <p class="text-red-400 text-xs font-black uppercase tracking-wider mb-1">⚠️ Emergency Load Shedding</p>
+                    <p class="text-gray-500 text-xs mb-3">Instantly cut power to an entire node (auto-restores in 15 s). Use as last resort.</p>
+                    <div class="grid grid-cols-4 gap-2">
+                        <button class="shed-btn-panel bg-red-900 hover:bg-red-800 border border-red-700 text-red-200 py-2 rounded-lg font-black text-sm transition-colors" data-group="1">N1</button>
+                        <button class="shed-btn-panel bg-red-900 hover:bg-red-800 border border-red-700 text-red-200 py-2 rounded-lg font-black text-sm transition-colors" data-group="2">N2</button>
+                        <button class="shed-btn-panel bg-red-900 hover:bg-red-800 border border-red-700 text-red-200 py-2 rounded-lg font-black text-sm transition-colors" data-group="3">N3</button>
+                        <button class="shed-btn-panel bg-red-900 hover:bg-red-800 border border-red-700 text-red-200 py-2 rounded-lg font-black text-sm transition-colors" data-group="4">N4</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ─── SCENARIO 2 Manager panels ──────────────────────────── -->
+    <div id="s2-manager" class="hidden">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+            <!-- Smart Controls -->
+            <div class="bg-gray-900 border border-blue-900 rounded-xl p-5 shadow">
+                <h3 class="font-black text-lg text-blue-400 mb-4">🤖 Smart Controls</h3>
+                <button id="auto-balance-btn" class="w-full bg-blue-800 hover:bg-blue-700 border border-blue-600 py-3 rounded-xl font-black text-white shadow-lg transition-colors mb-3 active:scale-95">
+                    ⚡ Auto-Balance Grid
+                </button>
+                <div id="auto-balance-msg" class="hidden text-sm text-green-400 bg-green-950 border border-green-800 rounded-lg px-3 py-2 mb-3 text-center"></div>
+                <div class="border-t border-gray-800 pt-4">
+                    <p class="text-orange-400 text-sm font-black mb-2">📡 Demand Response</p>
+                    <p class="text-gray-600 text-xs mb-2">Ask consumers to voluntarily reduce load. Rewards them with +20 pts.</p>
+                    <select id="dr-target-group" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-sm mb-2 text-gray-300">
+                        <option value="">All consumers</option>
+                        <option value="1">Node 1 only</option>
+                        <option value="2">Node 2 only</option>
+                        <option value="3">Node 3 only</option>
+                        <option value="4">Node 4 only</option>
+                    </select>
+                    <button id="broadcast-dr-btn" class="w-full bg-orange-800 hover:bg-orange-700 border border-orange-700 py-2.5 rounded-xl font-black text-white text-sm transition-colors active:scale-95">
+                        📡 Broadcast Request
+                    </button>
+                    <p id="dr-count" class="text-xs text-gray-600 text-center mt-2 mono">0 consumers accepted</p>
+                </div>
+            </div>
+            <!-- Leaderboard -->
+            <div class="bg-gray-900 border border-gray-700 rounded-xl p-5 shadow md:col-span-2">
+                <h3 class="font-black text-lg text-yellow-400 mb-4">🏆 Live Leaderboard</h3>
+                <div id="leaderboard-list" class="space-y-2 max-h-56 overflow-y-auto">
+                    <p class="text-gray-600 text-sm text-center py-4">Waiting for consumer data...</p>
+                </div>
+            </div>
+        </div>
+        <!-- Alerts + Predictive routing -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div class="bg-gray-900 border border-gray-700 rounded-xl p-5 shadow">
+                <h3 class="font-black text-lg text-red-400 mb-4">📋 Smart Alerts</h3>
+                <div id="s2-inbox" class="space-y-2 max-h-48 overflow-y-auto"></div>
+                <p id="s2-inbox-empty" class="text-gray-600 text-sm text-center py-4">✓ No alerts</p>
+            </div>
+            <div class="bg-gray-900 border border-yellow-900 rounded-xl p-5 shadow">
+                <h3 class="font-black text-lg text-yellow-400 mb-4">⚠️ Predictive Routing</h3>
+                <div id="routing-suggestions" class="space-y-2 max-h-48 overflow-y-auto">
+                    <p class="text-gray-600 text-sm text-center py-4">Grid is within limits...</p>
+                </div>
+            </div>
+        </div>
+        <!-- Live chart -->
+        <div class="bg-gray-900 border border-gray-700 rounded-xl p-5 shadow">
+            <h3 class="font-black text-lg text-blue-400 mb-4">📈 Live Grid Load</h3>
+            <canvas id="load-chart-canvas" height="70"></canvas>
+        </div>
+    </div>
+
+</div><!-- /manager-view -->
+
+<!-- ═══════════════ RESULTS ═══════════════ -->
+<div id="results-view" class="hidden max-w-3xl mx-auto px-4 pt-10 pb-20">
+    <div class="bg-gray-900 border border-blue-800 rounded-2xl p-8 shadow-2xl text-center">
+        <h2 class="text-4xl font-black mb-2">📊 Results</h2>
+        <p class="text-gray-500 mb-8">Scenario <span id="results-scenario">?</span> Summary</p>
         <canvas id="resultsChart"></canvas>
     </div>
+</div>
 
-    <div id="chat-modal" class="hidden fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center p-4 z-50">
-        <div class="bg-gray-800 rounded-lg p-6 w-full max-w-lg border-2 border-blue-600 shadow-2xl">
-            <div class="flex justify-between items-center mb-4">
-                <h3 class="text-xl font-bold text-blue-400">Dispatch Chat: <span id="chat-user-id"></span></h3>
-                <button id="close-chat-btn" class="text-gray-400 hover:text-white text-3xl leading-none">&times;</button>
+<!-- ═══════════════ MANAGER CHAT MODAL ═══════════════ -->
+<div id="chat-modal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+    <div class="bg-gray-900 rounded-2xl p-6 w-full max-w-lg border border-blue-700 shadow-2xl">
+        <div class="flex justify-between items-center mb-4">
+            <div>
+                <p class="text-blue-400 text-xs uppercase tracking-wider">Diagnostic Chat</p>
+                <h3 class="font-black text-xl">Consumer <span id="chat-user-id" class="text-blue-400 mono"></span></h3>
             </div>
-
-            <div id="chat-history" class="bg-gray-900 h-56 rounded p-4 mb-4 overflow-y-auto text-sm space-y-3 border border-gray-700">
-                <div class="text-gray-400 italic text-center text-xs">Connection established with consumer...</div>
-            </div>
-
-            <div class="w-full bg-gray-900 rounded-full h-4 mb-6 border border-gray-700">
-                <div id="resolution-bar" class="bg-blue-600 h-4 rounded-full transition-all duration-500" style="width: 0%"></div>
-            </div>
-
-            <div id="question-buttons" class="grid grid-cols-2 gap-3 mb-6">
-                <button class="diag-btn bg-gray-700 hover:bg-gray-600 p-3 rounded text-sm text-left font-semibold border border-gray-600 shadow" data-q="Have you checked your main breaker?" data-a="Yes, it's not tripped.">1. Check Breaker</button>
-                <button class="diag-btn bg-gray-700 hover:bg-gray-600 p-3 rounded text-sm text-left font-semibold border border-gray-600 shadow" data-q="Are your neighbors out of power too?" data-a="Yes, the whole street is dark.">2. Ask Neighbors</button>
-                <button class="diag-btn bg-gray-700 hover:bg-gray-600 p-3 rounded text-sm text-left font-semibold border border-gray-600 shadow" data-q="Did you hear any loud pops outside?" data-a="No, everything just went quiet.">3. Check Transformer</button>
-                <button class="diag-btn bg-gray-700 hover:bg-gray-600 p-3 rounded text-sm text-left font-semibold border border-gray-600 shadow" data-q="Were you running heavy appliances?" data-a="Maybe just the AC and the oven...">4. Check Local Load</button>
-            </div>
-
-            <button id="restore-power-btn" class="w-full bg-green-600 hover:bg-green-500 p-4 rounded font-bold text-lg disabled:opacity-50 disabled:cursor-not-allowed text-white shadow" disabled>
-                DIAGNOSTICS INCOMPLETE
-            </button>
+            <button id="close-chat-btn" class="text-gray-500 hover:text-white text-3xl leading-none transition-colors">×</button>
         </div>
-    </div>
 
-    <div id="consumer-chat-modal" class="hidden fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center p-4 z-50">
-        <div class="bg-gray-800 rounded-lg p-8 w-full max-w-md border-2 border-red-600 shadow-2xl text-center">
-            <div class="animate-pulse mb-4">
-                <h3 class="text-3xl font-bold text-red-500">🚨 Dispatch is calling</h3>
-            </div>
-            <p class="text-gray-300 mb-4 text-lg">Grid Manager asks:</p>
-            <div id="consumer-incoming-question" class="text-blue-400 font-bold text-xl mb-8 p-6 bg-gray-900 rounded border border-gray-700 shadow-inner">
-                </div>
-            <button id="consumer-reply-btn" class="w-full bg-blue-600 hover:bg-blue-500 p-5 rounded font-bold text-white text-lg transition-transform active:scale-95 shadow-lg">
-                Reply: <span id="consumer-reply-text" class="italic font-normal ml-1"></span>
-            </button>
+        <div id="chat-history" class="bg-gray-950 rounded-xl h-44 p-4 mb-4 overflow-y-auto text-sm space-y-2 border border-gray-800">
+            <p class="text-gray-600 text-xs italic text-center">Connection established...</p>
         </div>
-    </div>
 
-    <script src="js/main.js"></script>
-    <script src="js/admin.js"></script>
-    <script src="js/consumer.js"></script>
-    <script src="js/manager.js"></script>
+        <!-- Resolution progress -->
+        <div class="mb-4">
+            <div class="flex justify-between text-xs text-gray-500 mb-1">
+                <span>Diagnostic progress</span>
+                <span id="diag-steps-label" class="mono">0 / 4 steps</span>
+            </div>
+            <div class="bg-gray-800 rounded-full h-2 overflow-hidden border border-gray-700">
+                <div id="resolution-bar" class="bg-blue-500 h-2 rounded-full transition-all duration-500" style="width:0%"></div>
+            </div>
+        </div>
+
+        <div id="question-buttons" class="grid grid-cols-2 gap-2 mb-4">
+            <button class="diag-btn bg-gray-800 hover:bg-gray-700 border border-gray-700 p-3 rounded-xl text-sm font-semibold transition-colors text-left" data-q="Have you checked your main breaker?" data-a="Yes, it's not tripped.">🔧 Check Breaker</button>
+            <button class="diag-btn bg-gray-800 hover:bg-gray-700 border border-gray-700 p-3 rounded-xl text-sm font-semibold transition-colors text-left" data-q="Are your neighbors out of power too?" data-a="Yes, the whole street is dark.">🏘️ Ask Neighbors</button>
+            <button class="diag-btn bg-gray-800 hover:bg-gray-700 border border-gray-700 p-3 rounded-xl text-sm font-semibold transition-colors text-left" data-q="Did you hear any loud pops outside?" data-a="No, everything just went quiet.">💥 Check Transformer</button>
+            <button class="diag-btn bg-gray-800 hover:bg-gray-700 border border-gray-700 p-3 rounded-xl text-sm font-semibold transition-colors text-left" data-q="Were you running heavy appliances?" data-a="Maybe just the AC and the oven...">🏠 Check Appliances</button>
+        </div>
+
+        <button id="restore-power-btn" class="w-full bg-green-700 py-3.5 rounded-xl font-black text-lg disabled:opacity-40 disabled:cursor-not-allowed hover:bg-green-600 transition-colors" disabled>
+            DIAGNOSTICS INCOMPLETE
+        </button>
+    </div>
+</div>
+
+<!-- ═══════════════ CONSUMER CALL MODAL ═══════════════ -->
+<div id="consumer-chat-modal" class="hidden fixed inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+    <div class="bg-gray-900 rounded-2xl p-8 w-full max-w-md border border-red-700 shadow-2xl text-center">
+        <p class="text-red-400 text-xs uppercase tracking-widest animate-pulse mb-3">📞 Incoming call</p>
+        <h3 class="text-3xl font-black text-white mb-1">Grid Manager</h3>
+        <p class="text-gray-500 mb-6">is asking you:</p>
+        <div id="consumer-incoming-question" class="bg-gray-950 border border-gray-700 rounded-xl p-5 text-blue-300 font-bold text-xl mb-8 text-left"></div>
+        <button id="consumer-reply-btn" class="w-full bg-blue-700 hover:bg-blue-600 active:scale-95 py-4 rounded-xl font-black text-white text-lg transition-all shadow-lg">
+            Reply: <span id="consumer-reply-text" class="font-normal italic ml-1 text-base"></span>
+        </button>
+    </div>
+</div>
+
+<!-- ═══════════════ TOAST ═══════════════ -->
+<div id="toast" class="hidden fixed bottom-6 right-6 z-50 max-w-xs rounded-xl px-5 py-3 shadow-2xl text-sm font-bold border slide-right"></div>
+
+<script src="js/main.js"></script>
+<script src="js/admin.js"></script>
+<script src="js/consumer.js"></script>
+<script src="js/manager.js"></script>
 </body>
 </html>
