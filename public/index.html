@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="pt">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Smart Grid Workshop</title>
+    <title>Workshop da Rede Inteligente</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -19,7 +19,6 @@
         @keyframes glow-pulse      { 0%,100%{box-shadow:0 0 8px rgba(34,197,94,0.4)} 50%{box-shadow:0 0 20px rgba(34,197,94,0.9)} }
         @keyframes warning-flash   { 0%,100%{border-color:#f59e0b} 50%{border-color:#fbbf24} }
         @keyframes fade-in         { from{opacity:0} to{opacity:1} }
-        @keyframes line-pulse      { 0%,100%{opacity:0.5} 50%{opacity:1} }
 
         .blackout-anim { animation: blackout-pulse 0.7s infinite; }
         .slide-right   { animation: slide-in-right 0.35s ease-out; }
@@ -39,8 +38,6 @@
         .node-card.shed { border-color:#a855f7!important; box-shadow:0 0 12px rgba(168,85,247,0.3); }
 
         .load-bar { transition: width 0.4s ease, background-color 0.4s; }
-
-        /* SVG Grid Map */
         .map-line { transition: stroke 0.6s, stroke-width 0.6s, opacity 0.6s; }
         .map-node-circle { transition: stroke 0.6s, fill 0.6s; }
 
@@ -51,81 +48,78 @@
 </head>
 <body class="bg-gray-950 text-white min-h-screen">
 
-<!-- ═══════════════ ADMIN PANEL ═══════════════ -->
+<!-- ═══════════════ PAINEL DO INSTRUTOR ═══════════════ -->
 <div id="admin-panel" class="hidden bg-purple-950 border-b-2 border-purple-700 px-4 py-3">
     <div class="max-w-7xl mx-auto space-y-3">
-        <!-- Row 1: scenario + events -->
         <div class="flex flex-wrap items-center gap-2">
-            <span class="text-purple-300 text-xs font-black uppercase tracking-widest mr-2">🎓 Instructor</span>
-            <button id="btn-start-scen1" class="bg-gray-700 hover:bg-gray-600 border border-gray-600 px-3 py-1.5 rounded-lg font-bold text-xs">⚡ Scenario 1</button>
-            <button id="btn-start-scen2" class="bg-blue-700 hover:bg-blue-600 border border-blue-500 px-3 py-1.5 rounded-lg font-bold text-xs">🤖 Scenario 2</button>
-            <button id="btn-reset" class="bg-red-900 hover:bg-red-800 border border-red-700 px-3 py-1.5 rounded-lg font-bold text-xs">↺ Reset</button>
+            <span class="text-purple-300 text-xs font-black uppercase tracking-widest mr-2">🎓 Instrutor</span>
+            <button id="btn-start-scen1" class="bg-gray-700 hover:bg-gray-600 border border-gray-600 px-3 py-1.5 rounded-lg font-bold text-xs">⚡ Cenário 1</button>
+            <button id="btn-start-scen2" class="bg-blue-700 hover:bg-blue-600 border border-blue-500 px-3 py-1.5 rounded-lg font-bold text-xs">🤖 Cenário 2</button>
+            <button id="btn-reset"       class="bg-red-900 hover:bg-red-800 border border-red-700 px-3 py-1.5 rounded-lg font-bold text-xs">↺ Reiniciar</button>
             <div class="w-px h-5 bg-purple-700 mx-1"></div>
             <select id="admin-group-select" class="bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-xs mono text-gray-300">
-                <option value="">All Nodes</option>
-                <option value="1">Node 1</option><option value="2">Node 2</option>
-                <option value="3">Node 3</option><option value="4">Node 4</option>
+                <option value="">Todos os Nós</option>
+                <option value="1">Nó 1</option><option value="2">Nó 2</option>
+                <option value="3">Nó 3</option><option value="4">Nó 4</option>
             </select>
-            <button id="btn-inject-surge"  class="bg-yellow-800 hover:bg-yellow-700 border border-yellow-700 px-3 py-1.5 rounded-lg text-xs font-bold">⚡ Surge</button>
-            <button id="btn-inject-dr"     class="bg-green-800  hover:bg-green-700  border border-green-700  px-3 py-1.5 rounded-lg text-xs font-bold">📡 DR</button>
-            <button id="btn-inject-price"  class="bg-red-800    hover:bg-red-700    border border-red-700    px-3 py-1.5 rounded-lg text-xs font-bold">💰 Price Spike</button>
-            <button id="btn-inject-cloud"  class="bg-sky-800    hover:bg-sky-700    border border-sky-700    px-3 py-1.5 rounded-lg text-xs font-bold">☁️ Cloud</button>
-            <button id="btn-inject-wind"   class="bg-teal-800   hover:bg-teal-700   border border-teal-700   px-3 py-1.5 rounded-lg text-xs font-bold">🌬️ Wind Drop</button>
+            <button id="btn-inject-surge"  class="bg-yellow-800 hover:bg-yellow-700 border border-yellow-700 px-3 py-1.5 rounded-lg text-xs font-bold">⚡ Pico</button>
+            <button id="btn-inject-dr"     class="bg-green-800  hover:bg-green-700  border border-green-700  px-3 py-1.5 rounded-lg text-xs font-bold">📡 Resp. Procura</button>
+            <button id="btn-inject-price"  class="bg-red-800    hover:bg-red-700    border border-red-700    px-3 py-1.5 rounded-lg text-xs font-bold">💰 Subida de Preço</button>
+            <button id="btn-inject-cloud"  class="bg-sky-800    hover:bg-sky-700    border border-sky-700    px-3 py-1.5 rounded-lg text-xs font-bold">☁️ Nuvens</button>
+            <button id="btn-inject-wind"   class="bg-teal-800   hover:bg-teal-700   border border-teal-700   px-3 py-1.5 rounded-lg text-xs font-bold">🌬️ Queda de Vento</button>
         </div>
-        <!-- Row 2: quiz + QR -->
         <div class="flex flex-wrap items-center gap-2">
             <span class="text-purple-400 text-xs font-black uppercase tracking-widest mr-1">📝 Quiz:</span>
             <select id="quiz-question-select" class="bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-xs mono text-gray-300 max-w-xs">
-                <option value="0">Q1 – Why did the substation trip?</option>
-                <option value="1">Q2 – What does Demand Response do?</option>
-                <option value="2">Q3 – What enables real-time pricing?</option>
-                <option value="3">Q4 – Why low carbon off-peak?</option>
-                <option value="4">Q5 – Advantage of P2P trading?</option>
+                <option value="0">P1 – Por que disparou a subestação?</option>
+                <option value="1">P2 – O que é a Resposta à Procura?</option>
+                <option value="2">P3 – O que permite preços em tempo real?</option>
+                <option value="3">P4 – Porquê menos carbono no vazio?</option>
+                <option value="4">P5 – Vantagem do comércio P2P?</option>
             </select>
-            <button id="btn-start-quiz" class="bg-violet-700 hover:bg-violet-600 border border-violet-500 px-3 py-1.5 rounded-lg text-xs font-bold">▶ Start Quiz</button>
-            <button id="btn-end-quiz"   class="bg-violet-900 hover:bg-violet-800 border border-violet-700 px-3 py-1.5 rounded-lg text-xs font-bold hidden">⏹ Show Results</button>
-            <span id="quiz-live-count" class="text-xs text-gray-500 mono hidden">0 answered</span>
-            <div id="quiz-vote-bars" class="hidden flex gap-1 items-end h-8 ml-2"></div>
+            <button id="btn-start-quiz" class="bg-violet-700 hover:bg-violet-600 border border-violet-500 px-3 py-1.5 rounded-lg text-xs font-bold">▶ Iniciar Quiz</button>
+            <button id="btn-end-quiz"   class="bg-violet-900 hover:bg-violet-800 border border-violet-700 px-3 py-1.5 rounded-lg text-xs font-bold hidden">⏹ Ver Resultados</button>
+            <span id="quiz-live-count"  class="text-xs text-gray-500 mono hidden">0 responderam</span>
+            <div id="quiz-vote-bars"    class="hidden flex gap-1 items-end h-8 ml-2"></div>
             <div class="w-px h-5 bg-purple-700 mx-1"></div>
-            <span class="text-purple-400 text-xs font-black uppercase tracking-widest mr-1">QR:</span>
-            <button id="btn-show-qr" class="bg-gray-700 hover:bg-gray-600 border border-gray-600 px-3 py-1.5 rounded-lg text-xs font-bold">📱 Show QR</button>
-            <span id="admin-current-scenario" class="text-purple-200 text-xs font-bold ml-2">Scenario 1 — Legacy Grid</span>
+            <button id="btn-show-qr" class="bg-gray-700 hover:bg-gray-600 border border-gray-600 px-3 py-1.5 rounded-lg text-xs font-bold">📱 Mostrar QR</button>
+            <span id="admin-current-scenario" class="text-purple-200 text-xs font-bold ml-2">Cenário 1 — Rede Clássica</span>
         </div>
     </div>
 </div>
 
-<!-- ═══════════════ HEADER ═══════════════ -->
+<!-- ═══════════════ CABEÇALHO ═══════════════ -->
 <header class="border-b border-gray-800 px-4 py-3">
     <div class="max-w-6xl mx-auto flex justify-between items-center">
         <div>
             <h1 id="scenario-title" class="text-xl font-black tracking-tight">
-                Scenario 1: <span class="text-blue-400">Legacy Grid</span>
+                Cenário 1: <span class="text-blue-400">Rede Clássica</span>
             </h1>
-            <p class="text-gray-600 text-xs mt-0.5">Smart Grid Workshop</p>
+            <p class="text-gray-600 text-xs mt-0.5">Workshop da Rede Inteligente</p>
         </div>
         <div class="flex items-center gap-4">
             <div id="carbon-header-badge" class="hidden text-center">
-                <p class="text-xs text-gray-600">CO₂ intensity</p>
+                <p class="text-xs text-gray-600">Intensidade CO₂</p>
                 <p id="carbon-intensity-header" class="mono text-sm font-bold text-green-400">80 g/kWh</p>
             </div>
             <div class="text-right">
                 <p id="timer" class="mono text-2xl font-bold text-yellow-400">10:00</p>
-                <p class="text-gray-600 text-xs">remaining</p>
+                <p class="text-gray-600 text-xs">tempo restante</p>
             </div>
         </div>
     </div>
 </header>
 
-<!-- Renewable event banner (all users) -->
+<!-- Faixa de evento de renováveis -->
 <div id="renewable-event-banner" class="hidden bg-sky-950 border-b border-sky-700 px-4 py-2 text-center slide-down">
     <p id="renewable-event-text" class="text-sky-300 font-bold text-sm"></p>
 </div>
 
-<!-- ═══════════════ LOADING SCREEN ═══════════════ -->
+<!-- ═══════════════ ECRÃ DE CARREGAMENTO ═══════════════ -->
 <div id="loading-screen" class="flex flex-col items-center justify-center min-h-[70vh] text-center px-4">
     <div class="text-6xl mb-6 animate-pulse">⚡</div>
-    <h2 class="text-3xl font-black mb-2">Smart Grid Workshop</h2>
-    <p class="text-gray-500 mb-6">Connecting to simulation…</p>
+    <h2 class="text-3xl font-black mb-2">Workshop da Rede Inteligente</h2>
+    <p class="text-gray-500 mb-6">A ligar à simulação…</p>
     <div class="flex gap-2 justify-center">
         <span class="w-2 h-2 rounded-full bg-blue-500 animate-bounce" style="animation-delay:0s"></span>
         <span class="w-2 h-2 rounded-full bg-blue-500 animate-bounce" style="animation-delay:.15s"></span>
@@ -134,25 +128,25 @@
 </div>
 
 <!-- ═══════════════════════════════════════════
-     CONSUMER VIEW
+     VISTA DO CONSUMIDOR
 ════════════════════════════════════════════ -->
 <div id="consumer-view" class="hidden max-w-lg mx-auto px-4 pt-5 pb-12">
 
-    <!-- Task box -->
+    <!-- Caixa de desafio -->
     <div id="consumer-task-box" class="hidden bg-blue-950 border border-blue-700 rounded-xl p-4 mb-4 slide-down">
-        <p class="text-blue-400 text-xs font-black uppercase tracking-widest mb-1">🎯 Active Challenge</p>
+        <p class="text-blue-400 text-xs font-black uppercase tracking-widest mb-1">🎯 Desafio Ativo</p>
         <p id="task-name" class="text-white font-bold text-lg mb-1">–</p>
-        <p class="text-sm text-gray-400">Keep usage between <span id="task-target" class="text-yellow-400 font-bold mono">–</span></p>
+        <p class="text-sm text-gray-400">Mantém o consumo entre <span id="task-target" class="text-yellow-400 font-bold mono">–</span></p>
         <div class="mt-3 bg-gray-900 rounded-full h-2.5 border border-blue-900 overflow-hidden">
             <div id="task-progress" class="bg-blue-400 h-2.5 rounded-full transition-all duration-300" style="width:0%"></div>
         </div>
     </div>
 
-    <!-- Scores -->
+    <!-- Pontuações -->
     <div class="flex justify-between items-center mb-4">
         <div>
-            <p class="text-gray-500 text-xs uppercase tracking-wider">Your Home</p>
-            <h2 class="text-xl font-black">Node <span id="my-group" class="text-blue-400">–</span></h2>
+            <p class="text-gray-500 text-xs uppercase tracking-wider">A tua casa</p>
+            <h2 class="text-xl font-black">Nó <span id="my-group" class="text-blue-400">–</span></h2>
         </div>
         <div class="flex gap-2">
             <div class="bg-green-950 border border-green-800 text-green-300 px-3 py-1.5 rounded-lg mono text-sm font-bold">✅ <span id="compliance-score">0</span></div>
@@ -160,61 +154,64 @@
         </div>
     </div>
 
-    <!-- Power status -->
+    <!-- Estado da energia -->
     <div id="power-status" class="glow-green flex items-center justify-center gap-3 w-full py-4 bg-green-900 border border-green-700 rounded-xl mb-5 text-xl font-black shadow-lg">
         <span id="power-dot" class="w-3 h-3 rounded-full bg-green-400 shadow shadow-green-400"></span>
-        <span id="power-label">POWER ON</span>
+        <span id="power-label">COM ENERGIA</span>
     </div>
 
-    <!-- ─── SCENARIO 1 consumer ──────────────────────────── -->
+    <!-- ─── CENÁRIO 1 ──────────────────────────── -->
     <div id="s1-consumer">
-        <p class="text-gray-500 text-sm text-center mb-4">Toggle appliances to manage your home's electricity. <br>Too much load trips the grid for everyone!</p>
+        <p class="text-gray-500 text-sm text-center mb-4">
+            Liga e desliga os eletrodomésticos para gerir o consumo da tua casa.<br>
+            Demasiada carga provoca um apagão para toda a gente!
+        </p>
         <div id="appliance-grid" class="grid grid-cols-3 gap-3 mb-5"></div>
         <div class="bg-gray-900 border border-gray-700 rounded-xl p-4 mb-5">
             <div class="flex justify-between text-sm mb-2">
-                <span class="text-gray-400 font-semibold">Total Draw</span>
+                <span class="text-gray-400 font-semibold">Consumo total</span>
                 <span id="total-watts" class="mono font-bold text-white">0 W</span>
-                <span id="s1-cost" class="text-yellow-400 mono font-bold">€0.000/h</span>
+                <span id="s1-cost" class="text-yellow-400 mono font-bold">€0,000/h</span>
             </div>
             <div class="bg-gray-800 rounded-full h-4 overflow-hidden border border-gray-700">
                 <div id="usage-bar" class="load-bar h-4 rounded-full bg-green-500" style="width:0%"></div>
             </div>
-            <div class="flex justify-between text-xs text-gray-700 mt-1.5"><span>0 W</span><span class="text-red-700">▲ Danger</span><span>3450 W</span></div>
+            <div class="flex justify-between text-xs text-gray-700 mt-1.5"><span>0 W</span><span class="text-red-700">▲ Perigo</span><span>3450 W</span></div>
         </div>
-        <button id="call-help-btn" class="hidden w-full bg-red-700 hover:bg-red-600 active:scale-95 border border-red-500 py-4 rounded-xl font-black text-lg shadow-lg transition-all">📞 CALL GRID MANAGER</button>
+        <button id="call-help-btn" class="hidden w-full bg-red-700 hover:bg-red-600 active:scale-95 border border-red-500 py-4 rounded-xl font-black text-lg shadow-lg transition-all">📞 LIGAR AO GESTOR DA REDE</button>
     </div>
 
-    <!-- ─── SCENARIO 2 consumer ──────────────────────────── -->
+    <!-- ─── CENÁRIO 2 ──────────────────────────── -->
     <div id="s2-consumer" class="hidden">
 
-        <!-- Price ticker -->
+        <!-- Preço da eletricidade -->
         <div class="bg-gray-900 border border-gray-700 rounded-xl p-4 mb-4 flex items-center justify-between">
             <div>
-                <p class="text-xs text-gray-500 uppercase tracking-wider mb-1">Live Price</p>
+                <p class="text-xs text-gray-500 uppercase tracking-wider mb-1">Preço em tempo real</p>
                 <div class="flex items-center gap-3">
                     <span id="price-tier-badge" class="px-3 py-1 rounded-full text-sm font-black bg-yellow-500 text-black">🌤 Normal</span>
-                    <span id="price-value" class="mono text-3xl font-black">€0.15</span>
+                    <span id="price-value" class="mono text-3xl font-black">€0,15</span>
                     <span class="text-gray-600 text-sm">/kWh</span>
                 </div>
             </div>
             <div class="text-right">
-                <p class="text-xs text-gray-500">Your cost now</p>
-                <p id="s2-cost" class="mono text-xl font-bold text-yellow-400">€0.000/h</p>
+                <p class="text-xs text-gray-500">O teu custo agora</p>
+                <p id="s2-cost" class="mono text-xl font-bold text-yellow-400">€0,000/h</p>
             </div>
         </div>
 
-        <!-- Carbon tracker -->
+        <!-- Carbono -->
         <div id="carbon-tracker" class="bg-gray-900 border border-gray-700 rounded-xl p-4 mb-4">
             <div class="flex justify-between items-center">
                 <div>
-                    <p class="text-xs text-gray-500 uppercase tracking-wider mb-1">🌿 Carbon Tracker</p>
+                    <p class="text-xs text-gray-500 uppercase tracking-wider mb-1">🌿 Emissões de CO₂</p>
                     <div class="flex items-center gap-3">
                         <span id="carbon-intensity-badge" class="px-2 py-0.5 rounded-full text-xs font-black bg-green-800 text-green-300">80 g/kWh</span>
                         <span id="carbon-rate" class="mono text-sm text-gray-400">0 g/h</span>
                     </div>
                 </div>
                 <div class="text-right">
-                    <p class="text-xs text-gray-500">Session total</p>
+                    <p class="text-xs text-gray-500">Total da sessão</p>
                     <p id="carbon-footprint" class="mono text-lg font-bold text-green-400">0 g CO₂</p>
                 </div>
             </div>
@@ -223,39 +220,39 @@
             </div>
         </div>
 
-        <!-- DR voting banner -->
+        <!-- Votação da Resposta à Procura -->
         <div id="dr-banner" class="hidden bg-orange-950 border-2 border-orange-500 rounded-xl p-4 mb-4 slide-down">
-            <p class="text-orange-300 text-xs font-black uppercase tracking-widest animate-pulse mb-2">⚡ Demand Response Alert</p>
-            <p class="text-white font-bold mb-2">Grid under stress! Reduce your load and earn <span class="text-yellow-400">+20 pts</span>.</p>
+            <p class="text-orange-300 text-xs font-black uppercase tracking-widest animate-pulse mb-2">⚡ Alerta: Resposta à Procura</p>
+            <p class="text-white font-bold mb-2">A rede está sobrecarregada! Reduz o consumo e ganha <span class="text-yellow-400">+20 pts</span>.</p>
             <div class="bg-gray-900 rounded-lg p-2 mb-3 text-center">
-                <p class="text-sm text-gray-400">Neighbourhood vote: <span id="dr-vote-count" class="font-black text-white mono">0/0</span></p>
+                <p class="text-sm text-gray-400">Voto da vizinhança: <span id="dr-vote-count" class="font-black text-white mono">0/0</span></p>
                 <div class="bg-gray-800 rounded-full h-2 mt-1.5 overflow-hidden">
                     <div id="dr-vote-bar" class="load-bar h-2 rounded-full bg-orange-500" style="width:0%"></div>
                 </div>
-                <p class="text-xs text-gray-600 mt-1">Need 50% acceptance to unlock grid relief</p>
+                <p class="text-xs text-gray-600 mt-1">É necessário 50% de aceitação para aliviar a rede</p>
             </div>
-            <div id="dr-voted-msg" class="hidden text-center text-green-400 font-bold text-sm mb-2">✅ You voted — waiting for neighbours…</div>
+            <div id="dr-voted-msg" class="hidden text-center text-green-400 font-bold text-sm mb-2">✅ Votaste — a aguardar os vizinhos…</div>
             <div id="dr-vote-btns" class="flex gap-2">
-                <button id="dr-accept-btn" class="flex-1 bg-green-700 hover:bg-green-600 border border-green-500 py-2.5 rounded-lg font-black text-white transition-colors">✅ Accept</button>
-                <button id="dr-ignore-btn" class="flex-1 bg-gray-800 hover:bg-gray-700 border border-gray-600 py-2.5 rounded-lg font-bold text-gray-400 text-sm transition-colors">Ignore</button>
+                <button id="dr-accept-btn" class="flex-1 bg-green-700 hover:bg-green-600 border border-green-500 py-2.5 rounded-lg font-black text-white transition-colors">✅ Aceitar</button>
+                <button id="dr-ignore-btn" class="flex-1 bg-gray-800 hover:bg-gray-700 border border-gray-600 py-2.5 rounded-lg font-bold text-gray-400 text-sm transition-colors">Ignorar</button>
             </div>
         </div>
 
-        <!-- Appliances (smart mode) -->
-        <p class="text-gray-500 text-sm text-center mb-3">Smart grid: your solar & battery offset your draw.</p>
+        <!-- Eletrodomésticos (modo inteligente) -->
+        <p class="text-gray-500 text-sm text-center mb-3">Rede inteligente: o solar e a bateria reduzem o que compras à rede.</p>
         <div id="s2-appliance-grid" class="grid grid-cols-3 gap-3 mb-4"></div>
 
-        <!-- Scheduling button -->
+        <!-- Botão de programação -->
         <button id="open-schedule-btn" class="w-full bg-indigo-950 hover:bg-indigo-900 border border-indigo-700 text-indigo-300 py-2.5 rounded-xl text-sm font-bold mb-4 transition-colors">
-            🗓 Auto-Scheduling Rules <span class="text-indigo-500 text-xs ml-1">(set if/then rules)</span>
+            🗓 Regras Automáticas <span class="text-indigo-500 text-xs ml-1">(definir condições)</span>
         </button>
 
-        <!-- Solar + Battery -->
+        <!-- Solar + Bateria -->
         <div class="grid grid-cols-2 gap-3 mb-4">
             <div class="bg-gray-900 border border-yellow-800 rounded-xl p-4">
-                <p class="text-yellow-400 text-sm font-bold mb-2">☀️ Solar Output</p>
+                <p class="text-yellow-400 text-sm font-bold mb-2">☀️ Produção Solar</p>
                 <input type="range" id="produce-slider" min="0" max="100" value="0" class="w-full accent-yellow-400 cursor-pointer">
-                <div id="solar-modifier-indicator" class="hidden mt-1 text-xs text-sky-400 font-bold text-center">☁️ Reduced by clouds</div>
+                <div id="solar-modifier-indicator" class="hidden mt-1 text-xs text-sky-400 font-bold text-center">☁️ Reduzido pelas nuvens</div>
                 <p class="text-xs text-gray-500 mt-1 text-center">
                     <span id="solar-pct" class="mono text-yellow-400 font-bold">0</span>% →
                     <span id="solar-watts" class="mono text-yellow-300 font-bold">0</span> W
@@ -263,26 +260,26 @@
             </div>
             <div class="bg-gray-900 border border-blue-800 rounded-xl p-4">
                 <div class="flex justify-between items-center mb-2">
-                    <p class="text-blue-400 text-sm font-bold">🔋 Battery</p>
+                    <p class="text-blue-400 text-sm font-bold">🔋 Bateria</p>
                     <span id="battery-pct" class="mono text-white text-sm font-bold">50%</span>
                 </div>
                 <div class="bg-gray-800 rounded-full h-3 overflow-hidden border border-gray-700 mb-2.5">
                     <div id="battery-bar" class="load-bar h-3 rounded-full bg-blue-500" style="width:50%"></div>
                 </div>
                 <div class="grid grid-cols-3 gap-1">
-                    <button class="bat-btn py-1.5 rounded text-xs font-bold border border-gray-700 bg-gray-800 hover:bg-green-900 hover:border-green-700 transition-colors" data-mode="charge">⬆ Charge</button>
-                    <button class="bat-btn py-1.5 rounded text-xs font-bold border border-blue-700 bg-blue-950 transition-colors" data-mode="idle">Idle</button>
-                    <button class="bat-btn py-1.5 rounded text-xs font-bold border border-gray-700 bg-gray-800 hover:bg-yellow-900 hover:border-yellow-700 transition-colors" data-mode="discharge">⬇ Use</button>
+                    <button class="bat-btn py-1.5 rounded text-xs font-bold border border-gray-700 bg-gray-800 hover:bg-green-900 hover:border-green-700 transition-colors" data-mode="charge">⬆ Carregar</button>
+                    <button class="bat-btn py-1.5 rounded text-xs font-bold border border-blue-700 bg-blue-950 transition-colors" data-mode="idle">Parado</button>
+                    <button class="bat-btn py-1.5 rounded text-xs font-bold border border-gray-700 bg-gray-800 hover:bg-yellow-900 hover:border-yellow-700 transition-colors" data-mode="discharge">⬇ Usar</button>
                 </div>
             </div>
         </div>
 
-        <!-- Net import/export -->
+        <!-- Importação / Exportação -->
         <div class="bg-gray-900 border border-gray-700 rounded-xl p-4 mb-4">
             <div class="flex justify-between text-xs text-gray-500 mb-2">
-                <span>🔌 Importing</span>
-                <span id="net-label" class="mono font-bold text-white">Net: 0 W</span>
-                <span>☀️ Exporting</span>
+                <span>🔌 A importar</span>
+                <span id="net-label" class="mono font-bold text-white">Líquido: 0 W</span>
+                <span>☀️ A exportar</span>
             </div>
             <div class="flex items-center gap-1">
                 <div class="flex-1 bg-gray-800 h-3 rounded-l-full overflow-hidden border border-gray-700">
@@ -295,24 +292,24 @@
             </div>
         </div>
 
-        <!-- P2P Trading -->
+        <!-- Mercado P2P -->
         <div class="bg-gray-900 border border-purple-900 rounded-xl p-4 mb-4">
             <div class="flex items-center justify-between mb-3">
                 <div>
-                    <p class="text-purple-400 text-sm font-black">⚡ P2P Energy Market</p>
-                    <p class="text-gray-600 text-xs">Trade surplus solar with your node neighbours</p>
+                    <p class="text-purple-400 text-sm font-black">⚡ Mercado de Energia P2P</p>
+                    <p class="text-gray-600 text-xs">Vende o excedente solar aos vizinhos do teu nó</p>
                 </div>
-                <button id="open-p2p-offer-btn" class="bg-purple-900 hover:bg-purple-800 border border-purple-700 text-purple-300 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors">+ Sell Surplus</button>
+                <button id="open-p2p-offer-btn" class="bg-purple-900 hover:bg-purple-800 border border-purple-700 text-purple-300 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors">+ Vender Excedente</button>
             </div>
             <div id="p2p-offers-list" class="space-y-2 max-h-36 overflow-y-auto">
-                <p class="text-gray-700 text-xs text-center py-3">No active offers on your node</p>
+                <p class="text-gray-700 text-xs text-center py-3">Sem ofertas ativas no teu nó</p>
             </div>
         </div>
 
-        <!-- S1 usage bar reused in S2 (hidden label) -->
+        <!-- Barra de consumo S2 -->
         <div class="bg-gray-900 border border-gray-700 rounded-xl p-4">
             <div class="flex justify-between text-sm mb-2">
-                <span class="text-gray-400 font-semibold">Total Draw</span>
+                <span class="text-gray-400 font-semibold">Consumo total</span>
                 <span id="s2-total-watts" class="mono font-bold text-white">0 W</span>
             </div>
             <div class="bg-gray-800 rounded-full h-4 overflow-hidden border border-gray-700">
@@ -320,79 +317,70 @@
             </div>
         </div>
 
-    </div><!-- /s2-consumer -->
-</div><!-- /consumer-view -->
+    </div>
+</div>
 
 <!-- ═══════════════════════════════════════════════
-     MANAGER VIEW
+     VISTA DO GESTOR
 ════════════════════════════════════════════════ -->
 <div id="manager-view" class="hidden max-w-6xl mx-auto px-4 pt-5 pb-12">
 
     <div class="flex items-center justify-between mb-5">
         <div>
-            <p class="text-gray-500 text-xs uppercase tracking-widest">Grid Control</p>
-            <h2 class="text-2xl font-black">⚡ Dispatch Centre</h2>
+            <p class="text-gray-500 text-xs uppercase tracking-widest">Controlo da Rede</p>
+            <h2 class="text-2xl font-black">⚡ Centro de Controlo</h2>
         </div>
-        <div id="mgr-scenario-badge" class="bg-gray-800 border border-gray-600 px-4 py-1.5 rounded-full text-sm font-bold text-gray-300">Scenario 1</div>
+        <div id="mgr-scenario-badge" class="bg-gray-800 border border-gray-600 px-4 py-1.5 rounded-full text-sm font-bold text-gray-300">Cenário 1</div>
     </div>
 
-    <!-- ─── SVG Grid Map ─────────────────────────────── -->
+    <!-- Mapa SVG da rede -->
     <div class="bg-gray-900 border border-gray-700 rounded-xl p-4 mb-5 shadow-lg">
         <div class="flex justify-between items-center mb-3">
-            <h3 class="font-black text-lg text-blue-400">🗺️ Live Grid Topology</h3>
+            <h3 class="font-black text-lg text-blue-400">🗺️ Topologia da Rede em Tempo Real</h3>
             <div class="flex items-center gap-2 text-xs">
                 <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-green-500 inline-block"></span>Normal</span>
-                <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-yellow-500 inline-block"></span>Warning</span>
-                <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-red-500 inline-block"></span>Critical</span>
+                <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-yellow-500 inline-block"></span>Aviso</span>
+                <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-red-500 inline-block"></span>Crítico</span>
             </div>
         </div>
         <svg id="grid-map" viewBox="0 0 500 290" class="w-full max-h-64" xmlns="http://www.w3.org/2000/svg">
-            <!-- Transmission lines -->
-            <line id="line-ps-1" class="map-line" x1="250" y1="145" x2="108" y2="72" stroke="#3b82f6" stroke-width="3" opacity="0.5"/>
-            <line id="line-ps-2" class="map-line" x1="250" y1="145" x2="392" y2="72" stroke="#3b82f6" stroke-width="3" opacity="0.5"/>
+            <line id="line-ps-1" class="map-line" x1="250" y1="145" x2="108" y2="72"  stroke="#3b82f6" stroke-width="3" opacity="0.5"/>
+            <line id="line-ps-2" class="map-line" x1="250" y1="145" x2="392" y2="72"  stroke="#3b82f6" stroke-width="3" opacity="0.5"/>
             <line id="line-ps-3" class="map-line" x1="250" y1="145" x2="108" y2="218" stroke="#3b82f6" stroke-width="3" opacity="0.5"/>
             <line id="line-ps-4" class="map-line" x1="250" y1="145" x2="392" y2="218" stroke="#3b82f6" stroke-width="3" opacity="0.5"/>
-            <!-- Interconnects (ring) -->
             <line x1="108" y1="72"  x2="392" y2="72"  stroke="#1e3a5f" stroke-width="1.5" stroke-dasharray="5,5" opacity="0.4"/>
             <line x1="108" y1="218" x2="392" y2="218" stroke="#1e3a5f" stroke-width="1.5" stroke-dasharray="5,5" opacity="0.4"/>
             <line x1="108" y1="72"  x2="108" y2="218" stroke="#1e3a5f" stroke-width="1.5" stroke-dasharray="5,5" opacity="0.4"/>
             <line x1="392" y1="72"  x2="392" y2="218" stroke="#1e3a5f" stroke-width="1.5" stroke-dasharray="5,5" opacity="0.4"/>
-            <!-- Power station -->
             <circle cx="250" cy="145" r="30" fill="#1e3a5f" stroke="#3b82f6" stroke-width="2"/>
             <text x="250" y="140" text-anchor="middle" fill="#60a5fa" font-size="18" font-family="serif">⚡</text>
-            <text x="250" y="157" text-anchor="middle" fill="#93c5fd" font-size="8" font-weight="bold" font-family="monospace">GRID</text>
-            <!-- Node 1 (top-left) -->
-            <circle id="map-node-1" class="map-node-circle" cx="108" cy="72" r="26" fill="#1a2e1a" stroke="#22c55e" stroke-width="2.5"/>
+            <text x="250" y="157" text-anchor="middle" fill="#93c5fd" font-size="8" font-weight="bold" font-family="monospace">REDE</text>
+            <circle id="map-node-1" class="map-node-circle" cx="108" cy="72"  r="26" fill="#1a2e1a" stroke="#22c55e" stroke-width="2.5"/>
             <text x="108" y="67"  text-anchor="middle" fill="white" font-size="11" font-weight="bold" font-family="sans-serif">N1</text>
             <text id="map-pct-1" x="108" y="81" text-anchor="middle" fill="#86efac" font-size="9" font-family="monospace">0%</text>
             <text x="108" y="109" text-anchor="middle" font-size="10">🏠🏘</text>
-            <!-- Node 2 (top-right) -->
-            <circle id="map-node-2" class="map-node-circle" cx="392" cy="72" r="26" fill="#1a2e1a" stroke="#22c55e" stroke-width="2.5"/>
+            <circle id="map-node-2" class="map-node-circle" cx="392" cy="72"  r="26" fill="#1a2e1a" stroke="#22c55e" stroke-width="2.5"/>
             <text x="392" y="67"  text-anchor="middle" fill="white" font-size="11" font-weight="bold" font-family="sans-serif">N2</text>
             <text id="map-pct-2" x="392" y="81" text-anchor="middle" fill="#86efac" font-size="9" font-family="monospace">0%</text>
             <text x="392" y="109" text-anchor="middle" font-size="10">🏠🏘</text>
-            <!-- Node 3 (bottom-left) -->
             <circle id="map-node-3" class="map-node-circle" cx="108" cy="218" r="26" fill="#1a2e1a" stroke="#22c55e" stroke-width="2.5"/>
             <text x="108" y="213" text-anchor="middle" fill="white" font-size="11" font-weight="bold" font-family="sans-serif">N3</text>
             <text id="map-pct-3" x="108" y="227" text-anchor="middle" fill="#86efac" font-size="9" font-family="monospace">0%</text>
             <text x="108" y="255" text-anchor="middle" font-size="10">🏠🏘</text>
-            <!-- Node 4 (bottom-right) -->
             <circle id="map-node-4" class="map-node-circle" cx="392" cy="218" r="26" fill="#1a2e1a" stroke="#22c55e" stroke-width="2.5"/>
             <text x="392" y="213" text-anchor="middle" fill="white" font-size="11" font-weight="bold" font-family="sans-serif">N4</text>
             <text id="map-pct-4" x="392" y="227" text-anchor="middle" fill="#86efac" font-size="9" font-family="monospace">0%</text>
             <text x="392" y="255" text-anchor="middle" font-size="10">🏠🏘</text>
-            <!-- Carbon badge -->
             <rect x="195" y="175" width="110" height="22" rx="5" fill="#111827" stroke="#374151"/>
             <text id="map-carbon-text" x="250" y="191" text-anchor="middle" fill="#6b7280" font-size="9" font-family="monospace">220 gCO₂/kWh</text>
         </svg>
     </div>
 
-    <!-- Node cards -->
+    <!-- Cartões dos nós -->
     <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-5">
-        <!-- repeated x4 -->
         <div class="node-card bg-gray-900 border-2 border-gray-700 rounded-xl p-4 shadow-lg" id="node-card-1">
             <div class="flex justify-between items-start mb-3">
-                <div><p class="text-gray-500 text-xs">Node</p><p class="text-2xl font-black">1</p></div>
+                <div><p class="text-gray-500 text-xs">Nó</p><p class="text-2xl font-black">1</p></div>
                 <span class="node-badge text-xs font-bold px-2 py-1 rounded-lg bg-green-900 border border-green-800 text-green-300">🟢 Normal</span>
             </div>
             <div class="bg-gray-800 h-2.5 rounded-full overflow-hidden mb-1.5 border border-gray-700">
@@ -402,12 +390,12 @@
                 <span id="load-pct-1" class="mono text-gray-400">0%</span>
                 <span id="ticket-badge-1" class="hidden text-yellow-400 font-bold">🎫 0</span>
             </div>
-            <button class="shed-btn   mt-2 w-full hidden bg-red-950  hover:bg-red-900  border border-red-800  text-red-400  text-xs py-1.5 rounded-lg font-bold transition-colors" data-group="1">⚡ Shed Node</button>
-            <button class="reroute-btn mt-2 w-full hidden bg-blue-950 hover:bg-blue-900 border border-blue-800 text-blue-400 text-xs py-1.5 rounded-lg font-bold transition-colors" data-group="1">↔ Reroute</button>
+            <button class="shed-btn   mt-2 w-full hidden bg-red-950  hover:bg-red-900  border border-red-800  text-red-400  text-xs py-1.5 rounded-lg font-bold" data-group="1">⚡ Cortar Nó</button>
+            <button class="reroute-btn mt-2 w-full hidden bg-blue-950 hover:bg-blue-900 border border-blue-800 text-blue-400 text-xs py-1.5 rounded-lg font-bold" data-group="1">↔ Reencaminhar</button>
         </div>
         <div class="node-card bg-gray-900 border-2 border-gray-700 rounded-xl p-4 shadow-lg" id="node-card-2">
             <div class="flex justify-between items-start mb-3">
-                <div><p class="text-gray-500 text-xs">Node</p><p class="text-2xl font-black">2</p></div>
+                <div><p class="text-gray-500 text-xs">Nó</p><p class="text-2xl font-black">2</p></div>
                 <span class="node-badge text-xs font-bold px-2 py-1 rounded-lg bg-green-900 border border-green-800 text-green-300">🟢 Normal</span>
             </div>
             <div class="bg-gray-800 h-2.5 rounded-full overflow-hidden mb-1.5 border border-gray-700">
@@ -417,12 +405,12 @@
                 <span id="load-pct-2" class="mono text-gray-400">0%</span>
                 <span id="ticket-badge-2" class="hidden text-yellow-400 font-bold">🎫 0</span>
             </div>
-            <button class="shed-btn   mt-2 w-full hidden bg-red-950  hover:bg-red-900  border border-red-800  text-red-400  text-xs py-1.5 rounded-lg font-bold transition-colors" data-group="2">⚡ Shed Node</button>
-            <button class="reroute-btn mt-2 w-full hidden bg-blue-950 hover:bg-blue-900 border border-blue-800 text-blue-400 text-xs py-1.5 rounded-lg font-bold transition-colors" data-group="2">↔ Reroute</button>
+            <button class="shed-btn   mt-2 w-full hidden bg-red-950  hover:bg-red-900  border border-red-800  text-red-400  text-xs py-1.5 rounded-lg font-bold" data-group="2">⚡ Cortar Nó</button>
+            <button class="reroute-btn mt-2 w-full hidden bg-blue-950 hover:bg-blue-900 border border-blue-800 text-blue-400 text-xs py-1.5 rounded-lg font-bold" data-group="2">↔ Reencaminhar</button>
         </div>
         <div class="node-card bg-gray-900 border-2 border-gray-700 rounded-xl p-4 shadow-lg" id="node-card-3">
             <div class="flex justify-between items-start mb-3">
-                <div><p class="text-gray-500 text-xs">Node</p><p class="text-2xl font-black">3</p></div>
+                <div><p class="text-gray-500 text-xs">Nó</p><p class="text-2xl font-black">3</p></div>
                 <span class="node-badge text-xs font-bold px-2 py-1 rounded-lg bg-green-900 border border-green-800 text-green-300">🟢 Normal</span>
             </div>
             <div class="bg-gray-800 h-2.5 rounded-full overflow-hidden mb-1.5 border border-gray-700">
@@ -432,12 +420,12 @@
                 <span id="load-pct-3" class="mono text-gray-400">0%</span>
                 <span id="ticket-badge-3" class="hidden text-yellow-400 font-bold">🎫 0</span>
             </div>
-            <button class="shed-btn   mt-2 w-full hidden bg-red-950  hover:bg-red-900  border border-red-800  text-red-400  text-xs py-1.5 rounded-lg font-bold transition-colors" data-group="3">⚡ Shed Node</button>
-            <button class="reroute-btn mt-2 w-full hidden bg-blue-950 hover:bg-blue-900 border border-blue-800 text-blue-400 text-xs py-1.5 rounded-lg font-bold transition-colors" data-group="3">↔ Reroute</button>
+            <button class="shed-btn   mt-2 w-full hidden bg-red-950  hover:bg-red-900  border border-red-800  text-red-400  text-xs py-1.5 rounded-lg font-bold" data-group="3">⚡ Cortar Nó</button>
+            <button class="reroute-btn mt-2 w-full hidden bg-blue-950 hover:bg-blue-900 border border-blue-800 text-blue-400 text-xs py-1.5 rounded-lg font-bold" data-group="3">↔ Reencaminhar</button>
         </div>
         <div class="node-card bg-gray-900 border-2 border-gray-700 rounded-xl p-4 shadow-lg" id="node-card-4">
             <div class="flex justify-between items-start mb-3">
-                <div><p class="text-gray-500 text-xs">Node</p><p class="text-2xl font-black">4</p></div>
+                <div><p class="text-gray-500 text-xs">Nó</p><p class="text-2xl font-black">4</p></div>
                 <span class="node-badge text-xs font-bold px-2 py-1 rounded-lg bg-green-900 border border-green-800 text-green-300">🟢 Normal</span>
             </div>
             <div class="bg-gray-800 h-2.5 rounded-full overflow-hidden mb-1.5 border border-gray-700">
@@ -447,41 +435,41 @@
                 <span id="load-pct-4" class="mono text-gray-400">0%</span>
                 <span id="ticket-badge-4" class="hidden text-yellow-400 font-bold">🎫 0</span>
             </div>
-            <button class="shed-btn   mt-2 w-full hidden bg-red-950  hover:bg-red-900  border border-red-800  text-red-400  text-xs py-1.5 rounded-lg font-bold transition-colors" data-group="4">⚡ Shed Node</button>
-            <button class="reroute-btn mt-2 w-full hidden bg-blue-950 hover:bg-blue-900 border border-blue-800 text-blue-400 text-xs py-1.5 rounded-lg font-bold transition-colors" data-group="4">↔ Reroute</button>
+            <button class="shed-btn   mt-2 w-full hidden bg-red-950  hover:bg-red-900  border border-red-800  text-red-400  text-xs py-1.5 rounded-lg font-bold" data-group="4">⚡ Cortar Nó</button>
+            <button class="reroute-btn mt-2 w-full hidden bg-blue-950 hover:bg-blue-900 border border-blue-800 text-blue-400 text-xs py-1.5 rounded-lg font-bold" data-group="4">↔ Reencaminhar</button>
         </div>
     </div>
 
-    <!-- ─── SCENARIO 1 Manager ──────────────────────────── -->
+    <!-- ─── CENÁRIO 1 GESTOR ──────────────────────────── -->
     <div id="s1-manager">
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div class="bg-gray-900 border border-gray-700 rounded-xl p-5 shadow">
                 <div class="flex items-center gap-2 mb-4">
-                    <h3 class="font-black text-lg text-red-400">📋 Alert Inbox</h3>
+                    <h3 class="font-black text-lg text-red-400">📋 Caixa de Alertas</h3>
                     <span id="inbox-count" class="bg-red-900 border border-red-700 text-red-300 mono text-xs px-2 py-0.5 rounded-full">0</span>
                 </div>
                 <div id="inbox-list" class="space-y-3 max-h-72 overflow-y-auto pr-1"></div>
-                <p id="inbox-empty" class="text-gray-600 text-sm text-center py-6">✓ No active alerts</p>
+                <p id="inbox-empty" class="text-gray-600 text-sm text-center py-6">✓ Sem alertas ativos</p>
             </div>
             <div class="bg-gray-900 border border-gray-700 rounded-xl p-5 shadow">
-                <h3 class="font-black text-lg text-blue-400 mb-4">📊 Session Metrics</h3>
+                <h3 class="font-black text-lg text-blue-400 mb-4">📊 Métricas da Sessão</h3>
                 <div class="grid grid-cols-3 gap-3 mb-5">
                     <div class="bg-gray-800 rounded-lg p-3 text-center border border-gray-700">
                         <p class="mono text-2xl font-black text-red-400" id="stat-outages">0</p>
-                        <p class="text-xs text-gray-500 mt-1">Outages</p>
+                        <p class="text-xs text-gray-500 mt-1">Apagões</p>
                     </div>
                     <div class="bg-gray-800 rounded-lg p-3 text-center border border-gray-700">
                         <p class="mono text-2xl font-black text-yellow-400" id="stat-calls">0</p>
-                        <p class="text-xs text-gray-500 mt-1">Calls</p>
+                        <p class="text-xs text-gray-500 mt-1">Chamadas</p>
                     </div>
                     <div class="bg-gray-800 rounded-lg p-3 text-center border border-gray-700">
                         <p class="mono text-2xl font-black text-green-400" id="stat-resolved">0</p>
-                        <p class="text-xs text-gray-500 mt-1">Resolved</p>
+                        <p class="text-xs text-gray-500 mt-1">Resolvidos</p>
                     </div>
                 </div>
                 <div class="bg-red-950 border border-red-900 rounded-lg p-4">
-                    <p class="text-red-400 text-xs font-black uppercase tracking-wider mb-2">⚠️ Emergency Load Shedding</p>
-                    <p class="text-gray-500 text-xs mb-3">Cut an entire node for 15 s. Last resort.</p>
+                    <p class="text-red-400 text-xs font-black uppercase tracking-wider mb-2">⚠️ Corte de Carga de Emergência</p>
+                    <p class="text-gray-500 text-xs mb-3">Corta toda a energia de um nó durante 15 s. Usar apenas em último recurso.</p>
                     <div class="grid grid-cols-4 gap-2">
                         <button class="shed-btn-panel bg-red-900 hover:bg-red-800 border border-red-700 text-red-200 py-2 rounded-lg font-black text-sm" data-group="1">N1</button>
                         <button class="shed-btn-panel bg-red-900 hover:bg-red-800 border border-red-700 text-red-200 py-2 rounded-lg font-black text-sm" data-group="2">N2</button>
@@ -493,210 +481,198 @@
         </div>
     </div>
 
-    <!-- ─── SCENARIO 2 Manager ──────────────────────────── -->
+    <!-- ─── CENÁRIO 2 GESTOR ──────────────────────────── -->
     <div id="s2-manager" class="hidden">
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-            <!-- Smart controls -->
             <div class="bg-gray-900 border border-blue-900 rounded-xl p-5 shadow">
-                <h3 class="font-black text-lg text-blue-400 mb-4">🤖 Smart Controls</h3>
-                <button id="auto-balance-btn" class="w-full bg-blue-800 hover:bg-blue-700 border border-blue-600 py-3 rounded-xl font-black text-white mb-3 active:scale-95 transition-colors">⚡ Auto-Balance Grid</button>
+                <h3 class="font-black text-lg text-blue-400 mb-4">🤖 Controlos Inteligentes</h3>
+                <button id="auto-balance-btn" class="w-full bg-blue-800 hover:bg-blue-700 border border-blue-600 py-3 rounded-xl font-black text-white mb-3 active:scale-95 transition-colors">⚡ Auto-Equilibrar Rede</button>
                 <div id="auto-balance-msg" class="hidden text-sm text-center bg-green-950 border border-green-800 rounded-lg px-3 py-2 mb-3"></div>
                 <div class="border-t border-gray-800 pt-4">
-                    <p class="text-orange-400 text-sm font-black mb-2">📡 Demand Response</p>
+                    <p class="text-orange-400 text-sm font-black mb-2">📡 Resposta à Procura</p>
+                    <p class="text-gray-600 text-xs mb-2">Pede aos consumidores para reduzirem a carga voluntariamente. Recompensa-os com +20 pts.</p>
                     <select id="dr-target-group" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-sm mb-2 text-gray-300">
-                        <option value="">All consumers</option>
-                        <option value="1">Node 1</option><option value="2">Node 2</option>
-                        <option value="3">Node 3</option><option value="4">Node 4</option>
+                        <option value="">Todos os consumidores</option>
+                        <option value="1">Nó 1</option><option value="2">Nó 2</option>
+                        <option value="3">Nó 3</option><option value="4">Nó 4</option>
                     </select>
-                    <button id="broadcast-dr-btn" class="w-full bg-orange-800 hover:bg-orange-700 border border-orange-700 py-2.5 rounded-xl font-black text-white text-sm mb-2 active:scale-95 transition-colors">📡 Broadcast Request</button>
-                    <p id="dr-count" class="text-xs text-gray-600 text-center mono">0 accepted so far</p>
+                    <button id="broadcast-dr-btn" class="w-full bg-orange-800 hover:bg-orange-700 border border-orange-700 py-2.5 rounded-xl font-black text-white text-sm mb-2 active:scale-95 transition-colors">📡 Enviar Pedido</button>
+                    <p id="dr-count" class="text-xs text-gray-600 text-center mono">0 aceitaram até agora</p>
                 </div>
             </div>
-            <!-- Leaderboard -->
             <div class="bg-gray-900 border border-gray-700 rounded-xl p-5 shadow md:col-span-2">
-                <h3 class="font-black text-lg text-yellow-400 mb-4">🏆 Live Leaderboard</h3>
+                <h3 class="font-black text-lg text-yellow-400 mb-4">🏆 Classificação em Tempo Real</h3>
                 <div id="leaderboard-list" class="space-y-2 max-h-64 overflow-y-auto">
-                    <p class="text-gray-600 text-sm text-center py-4">Waiting for consumer data…</p>
+                    <p class="text-gray-600 text-sm text-center py-4">A aguardar dados dos consumidores…</p>
                 </div>
             </div>
         </div>
-        <!-- Alerts + Predictive -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
             <div class="bg-gray-900 border border-gray-700 rounded-xl p-5 shadow">
-                <h3 class="font-black text-lg text-red-400 mb-4">📋 Smart Alerts</h3>
+                <h3 class="font-black text-lg text-red-400 mb-4">📋 Alertas Inteligentes</h3>
                 <div id="s2-inbox" class="space-y-2 max-h-48 overflow-y-auto"></div>
-                <p id="s2-inbox-empty" class="text-gray-600 text-sm text-center py-4">✓ No alerts</p>
+                <p id="s2-inbox-empty" class="text-gray-600 text-sm text-center py-4">✓ Sem alertas</p>
             </div>
             <div class="bg-gray-900 border border-yellow-900 rounded-xl p-5 shadow">
-                <h3 class="font-black text-lg text-yellow-400 mb-4">⚠️ Predictive Routing</h3>
+                <h3 class="font-black text-lg text-yellow-400 mb-4">⚠️ Reencaminhamento Preditivo</h3>
                 <div id="routing-suggestions" class="space-y-2 max-h-48 overflow-y-auto">
-                    <p class="text-gray-600 text-sm text-center py-4">Grid is within limits…</p>
+                    <p class="text-gray-600 text-sm text-center py-4">A rede está dentro dos limites…</p>
                 </div>
             </div>
         </div>
-        <!-- Live chart -->
         <div class="bg-gray-900 border border-gray-700 rounded-xl p-5 shadow">
-            <h3 class="font-black text-lg text-blue-400 mb-4">📈 Live Grid Load</h3>
+            <h3 class="font-black text-lg text-blue-400 mb-4">📈 Carga da Rede em Tempo Real</h3>
             <canvas id="load-chart-canvas" height="70"></canvas>
         </div>
     </div>
 
 </div><!-- /manager-view -->
 
-<!-- ═══════════════ RESULTS / DEBRIEF ═══════════════ -->
+<!-- ═══════════════ ANÁLISE FINAL ═══════════════ -->
 <div id="results-view" class="hidden max-w-4xl mx-auto px-4 pt-8 pb-16">
     <div class="bg-gray-900 border border-blue-800 rounded-2xl p-8 shadow-2xl">
-        <h2 class="text-4xl font-black text-center mb-1">📊 Session Debrief</h2>
-        <p class="text-gray-500 text-center mb-8">Scenario <span id="results-scenario">?</span></p>
-
-        <!-- Main chart -->
+        <h2 class="text-4xl font-black text-center mb-1">📊 Análise Final</h2>
+        <p class="text-gray-500 text-center mb-8">Cenário <span id="results-scenario">?</span></p>
         <canvas id="resultsChart" class="mb-8"></canvas>
-
-        <!-- Scenario comparison -->
         <div id="scenario-comparison" class="hidden mb-8">
-            <h3 class="text-xl font-black mb-4 text-blue-400">Scenario 1 vs Scenario 2</h3>
+            <h3 class="text-xl font-black mb-4 text-blue-400">Cenário 1 vs Cenário 2</h3>
             <div class="grid grid-cols-2 gap-4">
                 <div class="bg-gray-800 border border-gray-700 rounded-xl p-4">
-                    <p class="font-black text-gray-400 mb-3">⚡ Legacy Grid</p>
+                    <p class="font-black text-gray-400 mb-3">⚡ Rede Clássica</p>
                     <div id="s1-snapshot" class="space-y-1 text-sm mono"></div>
                 </div>
                 <div class="bg-gray-800 border border-gray-700 rounded-xl p-4">
-                    <p class="font-black text-blue-400 mb-3">🤖 Smart Grid</p>
+                    <p class="font-black text-blue-400 mb-3">🤖 Rede Inteligente</p>
                     <div id="s2-snapshot" class="space-y-1 text-sm mono"></div>
                 </div>
             </div>
         </div>
-
-        <!-- Event timeline -->
         <div id="timeline-section" class="mb-8">
-            <h3 class="text-xl font-black mb-4 text-green-400">📅 Event Timeline</h3>
+            <h3 class="text-xl font-black mb-4 text-green-400">📅 Cronologia de Eventos</h3>
             <div id="timeline-list" class="space-y-2 max-h-64 overflow-y-auto pr-2"></div>
         </div>
-
-        <!-- Insight cards -->
         <div id="insights-section" class="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div class="bg-blue-950 border border-blue-800 rounded-xl p-4 text-center">
                 <p class="text-3xl mb-2">⚡</p>
-                <p class="font-black text-blue-300 mb-1">Smart Grids Prevent</p>
-                <p class="text-sm text-gray-400">Real-time monitoring stops overloads before they happen — no manual intervention needed.</p>
+                <p class="font-black text-blue-300 mb-1">As redes inteligentes previnem apagões</p>
+                <p class="text-sm text-gray-400">A monitorização em tempo real evita sobrecargas antes que aconteçam — sem intervenção manual.</p>
             </div>
             <div class="bg-green-950 border border-green-800 rounded-xl p-4 text-center">
                 <p class="text-3xl mb-2">🌿</p>
-                <p class="font-black text-green-300 mb-1">Time Your Usage</p>
-                <p class="text-sm text-gray-400">Shifting heavy loads to off-peak hours cuts costs AND reduces your carbon footprint by up to 5×.</p>
+                <p class="font-black text-green-300 mb-1">Escolhe a hora certa para consumir</p>
+                <p class="text-sm text-gray-400">Deslocar cargas pesadas para o período de vazio reduz a fatura E as emissões de CO₂ até 5 vezes.</p>
             </div>
             <div class="bg-purple-950 border border-purple-800 rounded-xl p-4 text-center">
                 <p class="text-3xl mb-2">🤝</p>
-                <p class="font-black text-purple-300 mb-1">Collective Action Works</p>
-                <p class="text-sm text-gray-400">When neighbours co-ordinate through demand response, the whole grid stays stable for everyone.</p>
+                <p class="font-black text-purple-300 mb-1">A ação coletiva resulta</p>
+                <p class="text-sm text-gray-400">Quando os vizinhos se coordenam através da Resposta à Procura, toda a rede fica estável para todos.</p>
             </div>
         </div>
     </div>
 </div>
 
-<!-- ═══════════════ QUIZ MODAL (all roles) ═══════════════ -->
+<!-- ═══════════════ MODAL DO QUIZ ═══════════════ -->
 <div id="quiz-modal" class="hidden fixed inset-0 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 z-50">
     <div class="bg-gray-900 border border-violet-700 rounded-2xl p-6 w-full max-w-lg shadow-2xl fade-in">
-        <p class="text-violet-400 text-xs font-black uppercase tracking-widest mb-3">📝 Quick Quiz</p>
-        <h3 id="quiz-question-text" class="text-white font-black text-xl mb-5 leading-tight">Question…</h3>
+        <p class="text-violet-400 text-xs font-black uppercase tracking-widest mb-3">📝 Pergunta Rápida</p>
+        <h3 id="quiz-question-text" class="text-white font-black text-xl mb-5 leading-tight">Pergunta…</h3>
         <div id="quiz-options-container" class="space-y-2 mb-5"></div>
-        <div id="quiz-answered-msg" class="hidden text-center py-3 text-green-400 font-bold">✅ Answer submitted — waiting for results…</div>
-        <!-- Results pane -->
+        <div id="quiz-answered-msg" class="hidden text-center py-3 text-green-400 font-bold">✅ Resposta enviada — a aguardar resultados…</div>
         <div id="quiz-results-pane" class="hidden">
             <div class="h-px bg-gray-700 mb-4"></div>
-            <p class="text-xs text-gray-500 uppercase tracking-wider mb-3">Results</p>
+            <p class="text-xs text-gray-500 uppercase tracking-wider mb-3">Resultados</p>
             <div id="quiz-results-bars" class="space-y-2 mb-4"></div>
             <div class="bg-green-950 border border-green-800 rounded-xl p-4">
-                <p class="text-green-400 font-black mb-1">💡 Explanation</p>
+                <p class="text-green-400 font-black mb-1">💡 Explicação</p>
                 <p id="quiz-explanation-text" class="text-sm text-gray-300"></p>
             </div>
-            <button id="quiz-close-btn" class="w-full mt-4 bg-gray-800 hover:bg-gray-700 border border-gray-600 py-2.5 rounded-xl font-bold text-sm transition-colors">Close</button>
+            <button id="quiz-close-btn" class="w-full mt-4 bg-gray-800 hover:bg-gray-700 border border-gray-600 py-2.5 rounded-xl font-bold text-sm transition-colors">Fechar</button>
         </div>
     </div>
 </div>
 
-<!-- ═══════════════ APPLIANCE SCHEDULING MODAL ═══════════════ -->
+<!-- ═══════════════ MODAL DE PROGRAMAÇÃO ═══════════════ -->
 <div id="schedule-modal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
     <div class="bg-gray-900 border border-indigo-700 rounded-2xl p-6 w-full max-w-md shadow-2xl">
         <div class="flex justify-between items-center mb-5">
             <div>
-                <p class="text-indigo-400 text-xs uppercase tracking-wider">Smart Home</p>
-                <h3 class="font-black text-xl">Auto-Scheduling Rules</h3>
+                <p class="text-indigo-400 text-xs uppercase tracking-wider">Casa Inteligente</p>
+                <h3 class="font-black text-xl">Regras Automáticas</h3>
             </div>
             <button id="close-schedule-modal" class="text-gray-500 hover:text-white text-3xl leading-none">×</button>
         </div>
         <div class="space-y-3 mb-5">
             <div>
-                <label class="text-xs text-gray-500 uppercase tracking-wider block mb-1">Appliance</label>
+                <label class="text-xs text-gray-500 uppercase tracking-wider block mb-1">Eletrodoméstico</label>
                 <select id="sched-appliance" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white">
-                    <option value="lights">💡 Lights</option>
-                    <option value="tv">📺 TV</option>
-                    <option value="ac">❄️ AC</option>
-                    <option value="oven">🍳 Oven</option>
-                    <option value="washer">🫧 Washer</option>
-                    <option value="ev">🚗 EV Charger</option>
+                    <option value="lights">💡 Luzes</option>
+                    <option value="tv">📺 Televisão</option>
+                    <option value="ac">❄️ Ar Condicionado</option>
+                    <option value="oven">🍳 Forno</option>
+                    <option value="washer">🫧 Máquina de Lavar</option>
+                    <option value="ev">🚗 Carregador VE</option>
                 </select>
             </div>
             <div class="grid grid-cols-2 gap-3">
                 <div>
-                    <label class="text-xs text-gray-500 uppercase tracking-wider block mb-1">Condition</label>
+                    <label class="text-xs text-gray-500 uppercase tracking-wider block mb-1">Condição</label>
                     <select id="sched-condition" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white">
-                        <option value="price_above">Price above €</option>
-                        <option value="price_below">Price below €</option>
-                        <option value="solar_above">Solar above %</option>
+                        <option value="price_above">Preço acima de €</option>
+                        <option value="price_below">Preço abaixo de €</option>
+                        <option value="solar_above">Solar acima de %</option>
                     </select>
                 </div>
                 <div>
-                    <label class="text-xs text-gray-500 uppercase tracking-wider block mb-1">Threshold</label>
+                    <label class="text-xs text-gray-500 uppercase tracking-wider block mb-1">Valor</label>
                     <input id="sched-threshold" type="number" step="0.01" value="0.20" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white" placeholder="0.20">
                 </div>
             </div>
             <div>
-                <label class="text-xs text-gray-500 uppercase tracking-wider block mb-1">Then…</label>
+                <label class="text-xs text-gray-500 uppercase tracking-wider block mb-1">Então…</label>
                 <select id="sched-action" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white">
-                    <option value="off">Turn OFF</option>
-                    <option value="on">Turn ON</option>
+                    <option value="off">Desligar</option>
+                    <option value="on">Ligar</option>
                 </select>
             </div>
         </div>
         <div id="active-schedules" class="mb-4 space-y-1"></div>
-        <button id="sched-save-btn" class="w-full bg-indigo-700 hover:bg-indigo-600 border border-indigo-500 py-3 rounded-xl font-black text-white transition-colors">✅ Save Rule</button>
-        <button id="sched-clear-btn" class="w-full mt-2 bg-gray-800 hover:bg-gray-700 border border-gray-700 py-2.5 rounded-xl font-bold text-gray-400 text-sm transition-colors">Clear All Rules</button>
+        <button id="sched-save-btn"  class="w-full bg-indigo-700 hover:bg-indigo-600 border border-indigo-500 py-3 rounded-xl font-black text-white transition-colors">✅ Guardar Regra</button>
+        <button id="sched-clear-btn" class="w-full mt-2 bg-gray-800 hover:bg-gray-700 border border-gray-700 py-2.5 rounded-xl font-bold text-gray-400 text-sm transition-colors">Apagar Todas as Regras</button>
     </div>
 </div>
 
-<!-- ═══════════════ P2P OFFER MODAL ═══════════════ -->
+<!-- ═══════════════ MODAL P2P ═══════════════ -->
 <div id="p2p-offer-modal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
     <div class="bg-gray-900 border border-purple-700 rounded-2xl p-6 w-full max-w-sm shadow-2xl">
         <div class="flex justify-between items-center mb-5">
             <div>
-                <p class="text-purple-400 text-xs uppercase tracking-wider">P2P Market</p>
-                <h3 class="font-black text-xl">Sell Surplus Energy</h3>
+                <p class="text-purple-400 text-xs uppercase tracking-wider">Mercado P2P</p>
+                <h3 class="font-black text-xl">Vender Excedente</h3>
             </div>
             <button id="close-p2p-modal" class="text-gray-500 hover:text-white text-3xl leading-none">×</button>
         </div>
-        <p class="text-gray-500 text-sm mb-4">Only consumers on your node (Node <span id="p2p-my-node" class="text-purple-400 font-bold">–</span>) can buy your offer.</p>
+        <p class="text-gray-500 text-sm mb-4">Só os consumidores do Nó <span id="p2p-my-node" class="text-purple-400 font-bold">–</span> podem comprar a tua oferta.</p>
         <div class="space-y-3 mb-5">
             <div>
-                <label class="text-xs text-gray-500 uppercase tracking-wider block mb-1">Amount (units)</label>
+                <label class="text-xs text-gray-500 uppercase tracking-wider block mb-1">Quantidade (unidades)</label>
                 <input id="p2p-amount-input" type="number" min="1" max="50" value="10" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white">
             </div>
             <div>
-                <label class="text-xs text-gray-500 uppercase tracking-wider block mb-1">Price (€/unit)</label>
+                <label class="text-xs text-gray-500 uppercase tracking-wider block mb-1">Preço (€/unidade)</label>
                 <input id="p2p-price-input" type="number" min="0.01" step="0.01" value="0.10" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white">
             </div>
         </div>
-        <button id="p2p-create-btn" class="w-full bg-purple-700 hover:bg-purple-600 border border-purple-500 py-3 rounded-xl font-black text-white transition-colors">⚡ Create Offer</button>
-        <button id="p2p-cancel-my-btn" class="w-full mt-2 bg-gray-800 hover:bg-gray-700 border border-gray-700 py-2.5 rounded-xl font-bold text-gray-400 text-sm transition-colors">Cancel My Offer</button>
+        <button id="p2p-create-btn"    class="w-full bg-purple-700 hover:bg-purple-600 border border-purple-500 py-3 rounded-xl font-black text-white transition-colors">⚡ Criar Oferta</button>
+        <button id="p2p-cancel-my-btn" class="w-full mt-2 bg-gray-800 hover:bg-gray-700 border border-gray-700 py-2.5 rounded-xl font-bold text-gray-400 text-sm transition-colors">Cancelar a Minha Oferta</button>
     </div>
 </div>
 
-<!-- ═══════════════ QR CODE MODAL ═══════════════ -->
+<!-- ═══════════════ MODAL QR CODE ═══════════════ -->
 <div id="qr-modal" class="hidden fixed inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 z-50">
     <div class="bg-gray-900 border border-gray-700 rounded-2xl p-8 w-full max-w-sm shadow-2xl text-center">
         <button id="close-qr-modal" class="float-right text-gray-500 hover:text-white text-2xl leading-none">×</button>
-        <p class="text-gray-400 text-xs uppercase tracking-widest mb-3">Scan to Join</p>
-        <h3 class="font-black text-2xl mb-4">Share with Students</h3>
+        <p class="text-gray-400 text-xs uppercase tracking-widest mb-3">Lê o código para entrar</p>
+        <h3 class="font-black text-2xl mb-4">Partilhar com os Alunos</h3>
         <div class="bg-white p-3 rounded-xl inline-block mb-4">
             <img id="qr-code-img" src="" alt="QR Code" class="w-48 h-48">
         </div>
@@ -704,47 +680,47 @@
     </div>
 </div>
 
-<!-- ═══════════════ MANAGER CHAT MODAL ═══════════════ -->
+<!-- ═══════════════ MODAL DE DIAGNÓSTICO (GESTOR) ═══════════════ -->
 <div id="chat-modal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
     <div class="bg-gray-900 rounded-2xl p-6 w-full max-w-lg border border-blue-700 shadow-2xl">
         <div class="flex justify-between items-center mb-4">
             <div>
-                <p class="text-blue-400 text-xs uppercase tracking-wider">Diagnostic Chat</p>
-                <h3 class="font-black text-xl">Consumer <span id="chat-user-id" class="text-blue-400 mono"></span></h3>
+                <p class="text-blue-400 text-xs uppercase tracking-wider">Diagnóstico</p>
+                <h3 class="font-black text-xl">Consumidor <span id="chat-user-id" class="text-blue-400 mono"></span></h3>
             </div>
             <button id="close-chat-btn" class="text-gray-500 hover:text-white text-3xl leading-none">×</button>
         </div>
         <div id="chat-history" class="bg-gray-950 rounded-xl h-44 p-4 mb-4 overflow-y-auto text-sm space-y-2 border border-gray-800">
-            <p class="text-gray-600 text-xs italic text-center">Connection established…</p>
+            <p class="text-gray-600 text-xs italic text-center">Ligação estabelecida…</p>
         </div>
         <div class="mb-4">
             <div class="flex justify-between text-xs text-gray-500 mb-1">
-                <span>Diagnostic progress</span>
-                <span id="diag-steps-label" class="mono">0 / 4 steps</span>
+                <span>Progresso do diagnóstico</span>
+                <span id="diag-steps-label" class="mono">0 / 4 passos</span>
             </div>
             <div class="bg-gray-800 rounded-full h-2 overflow-hidden border border-gray-700">
                 <div id="resolution-bar" class="bg-blue-500 h-2 rounded-full transition-all duration-500" style="width:0%"></div>
             </div>
         </div>
         <div id="question-buttons" class="grid grid-cols-2 gap-2 mb-4">
-            <button class="diag-btn bg-gray-800 hover:bg-gray-700 border border-gray-700 p-3 rounded-xl text-sm font-semibold transition-colors text-left" data-q="Have you checked your main breaker?" data-a="Yes, it's not tripped.">🔧 Check Breaker</button>
-            <button class="diag-btn bg-gray-800 hover:bg-gray-700 border border-gray-700 p-3 rounded-xl text-sm font-semibold transition-colors text-left" data-q="Are your neighbors out of power too?" data-a="Yes, the whole street is dark.">🏘️ Ask Neighbors</button>
-            <button class="diag-btn bg-gray-800 hover:bg-gray-700 border border-gray-700 p-3 rounded-xl text-sm font-semibold transition-colors text-left" data-q="Did you hear any loud pops outside?" data-a="No, everything just went quiet.">💥 Check Transformer</button>
-            <button class="diag-btn bg-gray-800 hover:bg-gray-700 border border-gray-700 p-3 rounded-xl text-sm font-semibold transition-colors text-left" data-q="Were you running heavy appliances?" data-a="Maybe just the AC and the oven...">🏠 Check Appliances</button>
+            <button class="diag-btn bg-gray-800 hover:bg-gray-700 border border-gray-700 p-3 rounded-xl text-sm font-semibold transition-colors text-left" data-q="Verificaste o disjuntor principal?" data-a="Sim, não disparou.">🔧 Ver Disjuntor</button>
+            <button class="diag-btn bg-gray-800 hover:bg-gray-700 border border-gray-700 p-3 rounded-xl text-sm font-semibold transition-colors text-left" data-q="Os teus vizinhos também estão sem luz?" data-a="Sim, a rua toda está às escuras.">🏘️ Perguntar Vizinhos</button>
+            <button class="diag-btn bg-gray-800 hover:bg-gray-700 border border-gray-700 p-3 rounded-xl text-sm font-semibold transition-colors text-left" data-q="Ouviste algum estrondo lá fora?" data-a="Não, tudo ficou simplesmente em silêncio.">💥 Ver Transformador</button>
+            <button class="diag-btn bg-gray-800 hover:bg-gray-700 border border-gray-700 p-3 rounded-xl text-sm font-semibold transition-colors text-left" data-q="Tinhas eletrodomésticos pesados ligados?" data-a="Talvez o AC e o forno ao mesmo tempo…">🏠 Ver Eletrodomésticos</button>
         </div>
-        <button id="restore-power-btn" class="w-full bg-green-700 py-3.5 rounded-xl font-black text-lg disabled:opacity-40 disabled:cursor-not-allowed hover:bg-green-600 transition-colors" disabled>DIAGNOSTICS INCOMPLETE</button>
+        <button id="restore-power-btn" class="w-full bg-green-700 py-3.5 rounded-xl font-black text-lg disabled:opacity-40 disabled:cursor-not-allowed hover:bg-green-600 transition-colors" disabled>DIAGNÓSTICO INCOMPLETO</button>
     </div>
 </div>
 
-<!-- ═══════════════ CONSUMER INCOMING CALL ═══════════════ -->
+<!-- ═══════════════ CHAMADA RECEBIDA (CONSUMIDOR) ═══════════════ -->
 <div id="consumer-chat-modal" class="hidden fixed inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 z-50">
     <div class="bg-gray-900 rounded-2xl p-8 w-full max-w-md border border-red-700 shadow-2xl text-center">
-        <p class="text-red-400 text-xs uppercase tracking-widest animate-pulse mb-3">📞 Incoming call</p>
-        <h3 class="text-3xl font-black text-white mb-1">Grid Manager</h3>
-        <p class="text-gray-500 mb-6">is asking you:</p>
+        <p class="text-red-400 text-xs uppercase tracking-widest animate-pulse mb-3">📞 Chamada recebida</p>
+        <h3 class="text-3xl font-black text-white mb-1">Gestor da Rede</h3>
+        <p class="text-gray-500 mb-6">está a perguntar:</p>
         <div id="consumer-incoming-question" class="bg-gray-950 border border-gray-700 rounded-xl p-5 text-blue-300 font-bold text-xl mb-8 text-left"></div>
         <button id="consumer-reply-btn" class="w-full bg-blue-700 hover:bg-blue-600 active:scale-95 py-4 rounded-xl font-black text-white text-lg transition-all shadow-lg">
-            Reply: <span id="consumer-reply-text" class="font-normal italic ml-1 text-base"></span>
+            Responder: <span id="consumer-reply-text" class="font-normal italic ml-1 text-base"></span>
         </button>
     </div>
 </div>

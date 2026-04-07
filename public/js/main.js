@@ -1,13 +1,13 @@
-// ─── Global Socket ────────────────────────────────────────────────────────────
+// ─── Socket global ────────────────────────────────────────────────────────────
 const socket = io();
 
-// ─── Global State ─────────────────────────────────────────────────────────────
+// ─── Estado global ────────────────────────────────────────────────────────────
 let myRole          = 'consumer';
 let myGroup         = 1;
 let currentScenario = 1;
 let isPowered       = true;
 
-// ─── Shared DOM refs ──────────────────────────────────────────────────────────
+// ─── Referências DOM partilhadas ──────────────────────────────────────────────
 const loadingScreen  = document.getElementById('loading-screen');
 const consumerView   = document.getElementById('consumer-view');
 const managerView    = document.getElementById('manager-view');
@@ -43,10 +43,9 @@ function showToast(msg, type = 'info') {
     toastTimer = setTimeout(() => toastEl.classList.add('hidden'), 3500);
 }
 
-// Expose globally for other files
 window.showToast = showToast;
 
-// ─── Scenario panel toggle ────────────────────────────────────────────────────
+// ─── Mostrar painéis certos conforme o cenário ────────────────────────────────
 function applyScenarioPanels(id) {
     if (myRole === 'consumer') {
         s1Consumer.classList.toggle('hidden', id !== 1);
@@ -55,11 +54,11 @@ function applyScenarioPanels(id) {
     } else if (myRole === 'manager') {
         s1Manager.classList.toggle('hidden', id !== 1);
         s2Manager.classList.toggle('hidden', id !== 2);
-        if (mgrScenBadge) mgrScenBadge.textContent = `Scenario ${id}`;
+        if (mgrScenBadge) mgrScenBadge.textContent = `Cenário ${id}`;
     }
 }
 
-// ─── Role assigned ────────────────────────────────────────────────────────────
+// ─── Papel atribuído ──────────────────────────────────────────────────────────
 socket.on('role_assigned', (data) => {
     myRole = data.role; myGroup = data.group; currentScenario = data.scenario;
     isPowered = true;
@@ -70,73 +69,71 @@ socket.on('role_assigned', (data) => {
         consumerView.classList.remove('hidden');
         managerView.classList.add('hidden');
         if (myGroupSpan) myGroupSpan.textContent = myGroup;
-        // Also update P2P node label
         const p2pNode = document.getElementById('p2p-my-node');
         if (p2pNode) p2pNode.textContent = myGroup;
     } else {
         consumerView.classList.add('hidden');
         managerView.classList.remove('hidden');
-        const inbox = document.getElementById('inbox-list');
+        const inbox   = document.getElementById('inbox-list');
         const s2Inbox = document.getElementById('s2-inbox');
-        if (inbox)   inbox.innerHTML = '';
+        if (inbox)   inbox.innerHTML   = '';
         if (s2Inbox) s2Inbox.innerHTML = '';
     }
 
     applyScenarioPanels(currentScenario);
     resultsView.classList.add('hidden');
-    showToast(`You are a ${myRole === 'manager' ? '🎛️ Manager' : '🏠 Consumer'} — Node ${myGroup}`, 'info');
+
+    const papelTraduzido = myRole === 'manager' ? '🎛️ Gestor' : '🏠 Consumidor';
+    showToast(`És ${papelTraduzido} — Nó ${myGroup}`, 'info');
 });
 
-// ─── Scenario change ──────────────────────────────────────────────────────────
+// ─── Mudança de cenário ───────────────────────────────────────────────────────
 socket.on('scenario_changed', (id) => {
     currentScenario = id;
-    const titles = { 1: 'Legacy Grid', 2: 'Smart Grid' };
-    const color   = id === 1 ? 'text-blue-400' : 'text-green-400';
+    const nomes  = { 1: 'Rede Clássica', 2: 'Rede Inteligente' };
+    const cor    = id === 1 ? 'text-blue-400' : 'text-green-400';
     if (scenarioTitle)
-        scenarioTitle.innerHTML = `Scenario ${id}: <span class="${color}">${titles[id]}</span>`;
+        scenarioTitle.innerHTML = `Cenário ${id}: <span class="${cor}">${nomes[id]}</span>`;
     applyScenarioPanels(id);
     resultsView.classList.add('hidden');
     if (myRole === 'consumer') consumerView.classList.remove('hidden');
     if (myRole === 'manager')  managerView.classList.remove('hidden');
-    showToast(`Switched to Scenario ${id}: ${titles[id]}`, 'info');
-    // Forward as global event for consumer/manager files
+    showToast(`Mudou para Cenário ${id}: ${nomes[id]}`, 'info');
     window.dispatchEvent(new CustomEvent('scenario_switched', { detail: id }));
 });
 
-// ─── Clock ────────────────────────────────────────────────────────────────────
+// ─── Relógio ──────────────────────────────────────────────────────────────────
 socket.on('time_update', (t) => {
     if (timerDisplay) timerDisplay.textContent = t;
 });
 
-// ─── Role swap ────────────────────────────────────────────────────────────────
+// ─── Troca de papéis ──────────────────────────────────────────────────────────
 socket.on('role_swap_alert', (data) => showToast(data.message, 'warning'));
 
-// ─── Price update ─────────────────────────────────────────────────────────────
+// ─── Evento de rede (pico, etc.) ──────────────────────────────────────────────
+socket.on('grid_event', (data) => showToast(data.message, 'warning'));
+
+// ─── Atualização de preço ─────────────────────────────────────────────────────
 socket.on('price_update', (pricing) => {
     window.__currentPrice = pricing;
     window.dispatchEvent(new CustomEvent('price_changed', { detail: pricing }));
 });
 
-// ─── Grid-wide event (surge, etc.) ───────────────────────────────────────────
-socket.on('grid_event', (data) => showToast(data.message, 'warning'));
-
-// ─── Carbon update → header badge ─────────────────────────────────────────────
+// ─── Carbono → badge no cabeçalho ─────────────────────────────────────────────
 socket.on('carbon_update', (data) => {
     window.__carbonData = data;
     if (carbonIntHdr) {
         const { intensity } = data;
-        const color = intensity > 300 ? 'text-red-400' : intensity > 150 ? 'text-yellow-400' : 'text-green-400';
-        carbonIntHdr.className = `mono text-sm font-bold ${color}`;
+        const cor = intensity > 300 ? 'text-red-400' : intensity > 150 ? 'text-yellow-400' : 'text-green-400';
+        carbonIntHdr.className = `mono text-sm font-bold ${cor}`;
         carbonIntHdr.textContent = `${intensity} g/kWh`;
     }
-    // Forward to consumer.js
     window.dispatchEvent(new CustomEvent('carbon_received', { detail: data }));
 });
 
-// ─── Renewable variability events ─────────────────────────────────────────────
+// ─── Eventos de renováveis ────────────────────────────────────────────────────
 socket.on('renewable_event', (data) => {
     if (!renewableBanner || !renewableBannerTxt) return;
-
     if (data.type === 'clear' || data.type === 'wind_restored') {
         renewableBanner.classList.add('hidden');
         showToast(data.message, 'success');
@@ -144,12 +141,11 @@ socket.on('renewable_event', (data) => {
         renewableBannerTxt.textContent = data.message;
         renewableBanner.classList.remove('hidden');
         showToast(data.message, 'warning');
-        // Notify consumer view about solar modifier
         window.dispatchEvent(new CustomEvent('renewable_changed', { detail: data }));
     }
 });
 
-// ─── Grid map SVG updates ─────────────────────────────────────────────────────
+// ─── Mapa SVG da rede ─────────────────────────────────────────────────────────
 function updateGridMap(state) {
     for (let i = 1; i <= 4; i++) {
         const g = state.groups[i];
@@ -163,32 +159,22 @@ function updateGridMap(state) {
         if (pctEl) pctEl.textContent = `${pct}%`;
 
         if (circle) {
-            if (g.shed) {
-                circle.setAttribute('stroke', '#a855f7');
-                circle.setAttribute('fill',   '#2d1b4e');
-            } else if (pct > 95) {
-                circle.setAttribute('stroke', '#ef4444');
-                circle.setAttribute('fill',   '#2d0d0d');
-            } else if (pct > 75) {
-                circle.setAttribute('stroke', '#f59e0b');
-                circle.setAttribute('fill',   '#2d1e05');
-            } else {
-                circle.setAttribute('stroke', '#22c55e');
-                circle.setAttribute('fill',   '#1a2e1a');
-            }
+            if (g.shed)       { circle.setAttribute('stroke', '#a855f7'); circle.setAttribute('fill', '#2d1b4e'); }
+            else if (pct > 95){ circle.setAttribute('stroke', '#ef4444'); circle.setAttribute('fill', '#2d0d0d'); }
+            else if (pct > 75){ circle.setAttribute('stroke', '#f59e0b'); circle.setAttribute('fill', '#2d1e05'); }
+            else              { circle.setAttribute('stroke', '#22c55e'); circle.setAttribute('fill', '#1a2e1a'); }
         }
 
         if (line) {
-            const color = pct > 95 ? '#ef4444' : pct > 75 ? '#f59e0b' : '#3b82f6';
-            const width = Math.max(2, Math.min(7, pct / 15));
-            const opacity = Math.max(0.25, Math.min(1, pct / 80));
-            line.setAttribute('stroke', color);
-            line.setAttribute('stroke-width', width);
-            line.setAttribute('opacity', opacity);
+            const cor    = pct > 95 ? '#ef4444' : pct > 75 ? '#f59e0b' : '#3b82f6';
+            const largura = Math.max(2, Math.min(7, pct / 15));
+            const opacidade = Math.max(0.25, Math.min(1, pct / 80));
+            line.setAttribute('stroke', cor);
+            line.setAttribute('stroke-width', largura);
+            line.setAttribute('opacity', opacidade);
         }
     }
 
-    // Carbon text on map
     const mapCarbon = document.getElementById('map-carbon-text');
     if (mapCarbon && state.carbonIntensity !== undefined) {
         mapCarbon.textContent = `${state.carbonIntensity} gCO₂/kWh`;
@@ -201,7 +187,7 @@ socket.on('state_update', (state) => {
     if (myRole === 'manager') updateGridMap(state);
 });
 
-// ─── Quiz modal ───────────────────────────────────────────────────────────────
+// ─── Modal do Quiz ────────────────────────────────────────────────────────────
 const quizModal        = document.getElementById('quiz-modal');
 const quizQuestionText = document.getElementById('quiz-question-text');
 const quizOptions      = document.getElementById('quiz-options-container');
@@ -229,7 +215,6 @@ socket.on('quiz_question', (data) => {
             if (myQuizAnswer !== null) return;
             myQuizAnswer = i;
             socket.emit('quiz_answer', { answer: i });
-            // Highlight selected
             quizOptions.querySelectorAll('button').forEach((b, bi) => {
                 b.disabled = true;
                 b.className = bi === i
@@ -245,7 +230,6 @@ socket.on('quiz_question', (data) => {
 });
 
 socket.on('quiz_live_votes', (data) => {
-    // Live vote count shown to admin — forwarded from main.js
     window.dispatchEvent(new CustomEvent('quiz_live_update', { detail: data }));
 });
 
@@ -257,25 +241,23 @@ socket.on('quiz_results', (data) => {
     if (quizExplanation) quizExplanation.textContent = data.explanation;
 
     const max = Math.max(1, ...Object.values(data.counts));
-
     data.options.forEach((opt, i) => {
-        const votes = data.counts[i] || 0;
-        const pct   = Math.round((votes / Math.max(1, data.total)) * 100);
-        const isCorrect = i === data.correct;
-        const isMyAnswer = i === myQuizAnswer;
-
+        const votos    = data.counts[i] || 0;
+        const pct      = Math.round((votos / Math.max(1, data.total)) * 100);
+        const certa    = i === data.correct;
+        const minha    = i === myQuizAnswer;
         const div = document.createElement('div');
         div.className = 'flex items-center gap-2';
         div.innerHTML = `
-            <span class="text-xs font-bold w-4 ${isCorrect ? 'text-green-400' : 'text-gray-500'}">${['A','B','C','D'][i]}</span>
-            <div class="flex-1 bg-gray-800 rounded-full h-6 overflow-hidden border ${isCorrect ? 'border-green-700' : 'border-gray-700'}">
-                <div class="h-6 rounded-full flex items-center pl-2 transition-all duration-700 ${isCorrect ? 'bg-green-700' : 'bg-gray-700'}" style="width:${Math.max(4, (votes / max) * 100)}%">
+            <span class="text-xs font-bold w-4 ${certa ? 'text-green-400' : 'text-gray-500'}">${['A','B','C','D'][i]}</span>
+            <div class="flex-1 bg-gray-800 rounded-full h-6 overflow-hidden border ${certa ? 'border-green-700' : 'border-gray-700'}">
+                <div class="h-6 rounded-full flex items-center pl-2 transition-all duration-700 ${certa ? 'bg-green-700' : 'bg-gray-700'}" style="width:${Math.max(4, (votos / max) * 100)}%">
                     <span class="text-xs font-bold text-white truncate">${opt}</span>
                 </div>
             </div>
-            <span class="mono text-xs text-gray-400 w-10 text-right">${votes} (${pct}%)</span>
-            ${isMyAnswer ? '<span class="text-xs">👈</span>' : ''}
-            ${isCorrect  ? '<span class="text-xs">✅</span>' : ''}
+            <span class="mono text-xs text-gray-400 w-12 text-right">${votos} (${pct}%)</span>
+            ${minha ? '<span class="text-xs">👈</span>' : ''}
+            ${certa ? '<span class="text-xs">✅</span>' : ''}
         `;
         quizResultsBars.appendChild(div);
     });
@@ -288,7 +270,7 @@ if (quizCloseBtn) {
     });
 }
 
-// ─── DR vote update → forward to consumer.js ─────────────────────────────────
+// ─── Votação RP → repassar ao consumer.js ────────────────────────────────────
 socket.on('dr_vote_update', (data) => {
     window.dispatchEvent(new CustomEvent('dr_vote_received', { detail: data }));
 });
@@ -296,18 +278,19 @@ socket.on('dr_vote_update', (data) => {
 socket.on('dr_resolved', (data) => {
     window.dispatchEvent(new CustomEvent('dr_resolved', { detail: data }));
     const msg = data.success
-        ? `✅ Node ${data.node} DR succeeded! ${data.yes}/${data.total} accepted.`
-        : `❌ Node ${data.node} DR failed. Only ${data.yes}/${data.total} accepted.`;
+        ? `✅ Nó ${data.node}: Resposta à Procura bem-sucedida! ${data.yes}/${data.total} aceitaram.`
+        : `❌ Nó ${data.node}: Resposta à Procura falhou. Só ${data.yes}/${data.total} aceitaram.`;
     showToast(msg, data.success ? 'success' : 'warning');
 });
 
-// ─── P2P market update → forward to consumer.js ──────────────────────────────
+// ─── Mercado P2P → repassar ao consumer.js ───────────────────────────────────
 socket.on('p2p_market_update', (offers) => {
     window.__p2pMarket = offers;
     window.dispatchEvent(new CustomEvent('p2p_market_received', { detail: offers }));
 });
 
-// ─── Schedule triggered toast ─────────────────────────────────────────────────
+// ─── Regra automática disparada ──────────────────────────────────────────────
 socket.on('schedule_triggered', (data) => {
-    showToast(`🗓 Auto-rule: ${data.appliance} turned ${data.action} (${data.condition})`, 'info');
+    const acao = data.action === 'on' ? 'ligado' : 'desligado';
+    showToast(`🗓 Regra automática: ${data.appliance} ${acao} (${data.condition})`, 'info');
 });
