@@ -321,7 +321,6 @@ function revealQuizResults() {
 
 function buildLeaderboardData() {
     return Object.entries(gameState.users)
-        .filter(([, u]) => u.role === 'consumer')
         .map(([id, u]) => ({
             id, name: u.name || 'Anónimo', group: u.group,
             quizScore: u.quizScore || 0,
@@ -507,23 +506,26 @@ io.on('connection', (socket) => {
 
     socket.on('quiz_answer', (data) => {
         if (!activeQuiz || quizAnswers[socket.id] !== undefined) return;
-        quizAnswers[socket.id] = data.answer;
         const user = gameState.users[socket.id];
+        if (!user) return;
+        
+        quizAnswers[socket.id] = data.answer;
         const isCorrect = data.answer === activeQuiz.correct;
-        if (user) {
-            if (isCorrect) user.quizScore = (user.quizScore || 0) + 10;
-            socket.emit('quiz_answer_result', { correct: isCorrect, newScore: user.quizScore || 0 });
-        }
+
+        if (isCorrect) user.quizScore = (user.quizScore || 0) + 10;
+        socket.emit('quiz_answer_result', { correct: isCorrect, newScore: user.quizScore || 0 });
+
         const counts = {};
         activeQuiz.options.forEach((_, i) => { counts[i] = 0; });
         Object.values(quizAnswers).forEach(a => { counts[a] = (counts[a] || 0) + 1; });
         const answered = Object.keys(quizAnswers).length;
+
         io.emit('quiz_live_votes', { counts, total: answered });
         io.emit('admin_leaderboard_update', buildLeaderboardData());
 
-        // Rapid-fire: se todos os consumidores ativos já responderam, revelar imediatamente
-        const activeConsumers = Object.values(gameState.users).filter(u => u.role === 'consumer').length;
-        if (activeConsumers > 0 && answered >= activeConsumers) {
+        // Exclui apenas quem não está na lista 'users' (Admins)
+        const totalParticipants = Object.keys(gameState.users).length;
+        if (totalParticipants > 0 && answered >= totalParticipants) {
             if (quizDeadlineTimeout) { clearTimeout(quizDeadlineTimeout); quizDeadlineTimeout = null; }
             io.emit('quiz_early_end'); // diz aos clientes para pararem o cronómetro
             setTimeout(revealQuizResults, 400);

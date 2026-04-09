@@ -344,8 +344,9 @@ function lockQuizOptions() {
 // ── New question arrives ──────────────────────────────────────────────────────
 socket.on('quiz_question', (data) => {
     // BUG FIX: always reset state before showing new question
+    if (isAdminView) return;
+    
     resetQuizState();
-
     if (!quizModal) return;
     if (quizQuestionText) quizQuestionText.textContent = data.question;
     if (quizProgressLabel) quizProgressLabel.textContent = `P${data.index + 1} / ${data.total || 10}`;
