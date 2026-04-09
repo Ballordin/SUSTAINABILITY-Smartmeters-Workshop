@@ -258,7 +258,8 @@ function resetGameMetrics() {
         io.to(id).emit('quiz_reset'); // client resets quiz state
     }
 
-    timerSeconds = 360; isGameRunning = true; pricingTick = 0;
+    timerSeconds = gameState.scenario === 1 ? 360 : 600;
+    isGameRunning = true; pricingTick = 0;
     gameState.pricing = { ...PRICE_TIERS[1] };
     gameState.carbonIntensity = getCurrentCarbonIntensity();
     io.emit('price_update', gameState.pricing);
@@ -501,9 +502,7 @@ io.on('connection', (socket) => {
         launchQuizQuestion(data.questionIndex % QUIZ_QUESTIONS.length);
     });
 
-    socket.on('admin_end_quiz', () => {
-        if (activeQuiz) revealQuizResults();
-    });
+    // Quiz results are revealed automatically after the 30-second deadline — no manual reveal
 
     socket.on('quiz_answer', (data) => {
         if (!activeQuiz || quizAnswers[socket.id] !== undefined) return;

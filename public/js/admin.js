@@ -92,7 +92,6 @@ document.getElementById('btn-inject-wind')?.addEventListener('click', () => {
 
 // ─── Controlos do Quiz ────────────────────────────────────────────────────────
 const btnStartQuiz  = document.getElementById('btn-start-quiz');
-const btnEndQuiz    = document.getElementById('btn-end-quiz');
 const quizSelect    = document.getElementById('quiz-question-select');
 const quizLiveCount = document.getElementById('quiz-live-count');
 const quizVoteBars  = document.getElementById('quiz-vote-bars');
@@ -103,21 +102,18 @@ btnStartQuiz?.addEventListener('click', () => {
     const idx = parseInt(quizSelect?.value || '0');
     socket.emit('admin_start_quiz', { questionIndex: idx });
     quizActive = true;
-    btnStartQuiz.classList.add('hidden');
-    btnEndQuiz?.classList.remove('hidden');
+    btnStartQuiz.disabled = true;
+    btnStartQuiz.classList.add('opacity-50', 'cursor-not-allowed');
     if (quizLiveCount) { quizLiveCount.classList.remove('hidden'); quizLiveCount.textContent = '0 responderam'; }
     if (quizVoteBars)  quizVoteBars.classList.remove('hidden');
     showToast('📝 Quiz iniciado! Os alunos têm 30 segundos.', 'info');
-});
-
-btnEndQuiz?.addEventListener('click', () => {
-    socket.emit('admin_end_quiz');
-    quizActive = false;
-    btnEndQuiz.classList.add('hidden');
-    btnStartQuiz?.classList.remove('hidden');
-    if (quizLiveCount) quizLiveCount.classList.add('hidden');
-    if (quizVoteBars)  quizVoteBars.classList.add('hidden');
-    showToast('📊 Resultados do quiz revelados!', 'success');
+    // Re-enable after 32s (30s deadline + buffer)
+    setTimeout(() => {
+        quizActive = false;
+        if (btnStartQuiz) { btnStartQuiz.disabled = false; btnStartQuiz.classList.remove('opacity-50', 'cursor-not-allowed'); }
+        if (quizLiveCount) quizLiveCount.classList.add('hidden');
+        if (quizVoteBars)  quizVoteBars.classList.add('hidden');
+    }, 32000);
 });
 
 // Live vote mini-bars (admin only)
