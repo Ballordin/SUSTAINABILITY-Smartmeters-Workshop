@@ -127,6 +127,13 @@ socket.on('state_update', (state) => {
         if (drCountLabel) drCountLabel.textContent  = `${drTotalAceites} aceitaram até agora`;
     }
 
+    // Participants counter
+    const statParticipants = document.getElementById('stat-participants');
+    if (statParticipants && state.users) {
+        const count = Object.values(state.users).filter(u => u.role === 'consumer').length;
+        statParticipants.textContent = count;
+    }
+
     for (let i = 1; i <= 4; i++) {
         const g = state.groups[i];
         if (!g) continue;
