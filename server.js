@@ -258,7 +258,8 @@ function resetGameMetrics() {
         io.to(id).emit('quiz_reset'); // client resets quiz state
     }
 
-    timerSeconds = 360; isGameRunning = true; pricingTick = 0;
+    timerSeconds = gameState.scenario === 1 ? 360 : 600;
+    isGameRunning = true; pricingTick = 0;
     gameState.pricing = { ...PRICE_TIERS[1] };
     gameState.carbonIntensity = getCurrentCarbonIntensity();
     io.emit('price_update', gameState.pricing);
@@ -320,7 +321,6 @@ function revealQuizResults() {
 
 function buildLeaderboardData() {
     return Object.entries(gameState.users)
-        .filter(([, u]) => u.role === 'consumer')
         .map(([id, u]) => ({
             id, name: u.name || 'Anónimo', group: u.group,
             quizScore: u.quizScore || 0,
@@ -338,8 +338,9 @@ io.on('connection', (socket) => {
     socket.on('register_user', (data) => {
         if (data.isAdmin) {
             syncClock(socket);
-            // Send current leaderboard to admin immediately
             socket.emit('admin_leaderboard_update', buildLeaderboardData());
+            // Signal client to enter spectator/manager view — admin is NOT a participant
+            socket.emit('admin_init', { scenario: gameState.scenario, scenarioName: SCENARIO_NAMES[gameState.scenario] });
         } else {
             assignRoleAndGroup(socket, data.name);
         }
@@ -501,24 +502,34 @@ io.on('connection', (socket) => {
         launchQuizQuestion(data.questionIndex % QUIZ_QUESTIONS.length);
     });
 
-    socket.on('admin_end_quiz', () => {
-        if (activeQuiz) revealQuizResults();
-    });
+    // Quiz results are revealed automatically after the 30-second deadline — no manual reveal
 
     socket.on('quiz_answer', (data) => {
         if (!activeQuiz || quizAnswers[socket.id] !== undefined) return;
-        quizAnswers[socket.id] = data.answer;
         const user = gameState.users[socket.id];
+        if (!user) return;
+        
+        quizAnswers[socket.id] = data.answer;
         const isCorrect = data.answer === activeQuiz.correct;
-        if (user) {
-            if (isCorrect) user.quizScore = (user.quizScore || 0) + 10;
-            socket.emit('quiz_answer_result', { correct: isCorrect, newScore: user.quizScore || 0 });
-        }
+
+        if (isCorrect) user.quizScore = (user.quizScore || 0) + 10;
+        socket.emit('quiz_answer_result', { correct: isCorrect, newScore: user.quizScore || 0 });
+
         const counts = {};
         activeQuiz.options.forEach((_, i) => { counts[i] = 0; });
         Object.values(quizAnswers).forEach(a => { counts[a] = (counts[a] || 0) + 1; });
-        io.emit('quiz_live_votes', { counts, total: Object.keys(quizAnswers).length });
+        const answered = Object.keys(quizAnswers).length;
+
+        io.emit('quiz_live_votes', { counts, total: answered });
         io.emit('admin_leaderboard_update', buildLeaderboardData());
+
+        // Exclui apenas quem não está na lista 'users' (Admins)
+        const totalParticipants = Object.keys(gameState.users).length;
+        if (totalParticipants > 0 && answered >= totalParticipants) {
+            if (quizDeadlineTimeout) { clearTimeout(quizDeadlineTimeout); quizDeadlineTimeout = null; }
+            io.emit('quiz_early_end'); // diz aos clientes para pararem o cronómetro
+            setTimeout(revealQuizResults, 400);
+        }
     });
 
     // ── Admin events ──────────────────────────────────────────────────────────

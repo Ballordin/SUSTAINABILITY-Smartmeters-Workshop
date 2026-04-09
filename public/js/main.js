@@ -54,18 +54,16 @@ const nicknameBtn    = document.getElementById('nickname-submit-btn');
 const nicknameError  = document.getElementById('nickname-error');
 
 if (isAdminView) {
-    // Admins skip nickname modal
+    // Instrutor: salta nickname modal, entra directamente na vista de espectador/gestor
     if (nicknameModal) nicknameModal.classList.add('hidden');
-    if (loadingScreen) {
-        loadingScreen.innerHTML = `
-            <div class="text-center">
-                <div class="text-5xl mb-4">🎓</div>
-                <p class="text-purple-300 font-black text-xl mb-1">Vista do Instrutor</p>
-                <p class="text-gray-500 text-sm">Painel de controlo ativo no topo da página.</p>
-            </div>`;
-    }
+    if (loadingScreen) loadingScreen.classList.add('hidden');
+    // Definir papel como gestor localmente — admin não é um participante
+    myRole = 'manager';
+    if (consumerView) consumerView.classList.add('hidden');
+    if (managerView)  managerView.classList.remove('hidden');
+    applyScenarioPanels(1); // padrão Cenário 1 até receber admin_init
 } else {
-    // Show nickname modal for students
+    // Alunos: mostrar modal de nome
     if (nicknameModal) nicknameModal.classList.remove('hidden');
     if (loadingScreen) loadingScreen.classList.add('hidden');
 }
@@ -98,6 +96,18 @@ function applyScenarioPanels(id) {
     }
 }
 
+// ─── Admin init (espectador/gestor persistente) ───────────────────────────────
+socket.on('admin_init', (data) => {
+    currentScenario = data.scenario;
+    myRole = 'manager';
+    if (consumerView) consumerView.classList.add('hidden');
+    if (managerView)  managerView.classList.remove('hidden');
+    if (loadingScreen) loadingScreen.classList.add('hidden');
+    applyScenarioPanels(data.scenario);
+    const cor = data.scenario === 1 ? 'text-blue-400' : 'text-green-400';
+    if (scenarioTitle) scenarioTitle.innerHTML = `Cenário ${data.scenario}: <span class="${cor}">${data.scenarioName}</span>`;
+});
+
 // ─── Papel atribuído ──────────────────────────────────────────────────────────
 socket.on('role_assigned', (data) => {
     myRole = data.role; myGroup = data.group; currentScenario = data.scenario;
@@ -128,11 +138,23 @@ socket.on('role_assigned', (data) => {
 
 // ─── Mudança de cenário ───────────────────────────────────────────────────────
 socket.on('scenario_changed', (data) => {
-    const id = data.id || data; // backwards compat
+    const id = data.id || data;
     const name = data.name || (id === 1 ? 'Rede Elétrica Tradicional' : 'Rede Elétrica Inteligente');
     currentScenario = id;
     const cor = id === 1 ? 'text-blue-400' : 'text-green-400';
     if (scenarioTitle) scenarioTitle.innerHTML = `Cenário ${id}: <span class="${cor}">${name}</span>`;
+
+    if (isAdminView) {
+        // Instrutor mantém sempre a vista de gestor — nunca muda para consumidor
+        myRole = 'manager';
+        consumerView?.classList.add('hidden');
+        managerView?.classList.remove('hidden');
+        applyScenarioPanels(id);
+        showToast(`Cenário ${id}: ${name}`, 'info');
+        window.dispatchEvent(new CustomEvent('scenario_switched', { detail: id }));
+        return;
+    }
+
     applyScenarioPanels(id);
     resultsView?.classList.add('hidden');
     if (myRole === 'consumer') consumerView?.classList.remove('hidden');
@@ -322,8 +344,9 @@ function lockQuizOptions() {
 // ── New question arrives ──────────────────────────────────────────────────────
 socket.on('quiz_question', (data) => {
     // BUG FIX: always reset state before showing new question
+    if (isAdminView) return;
+    
     resetQuizState();
-
     if (!quizModal) return;
     if (quizQuestionText) quizQuestionText.textContent = data.question;
     if (quizProgressLabel) quizProgressLabel.textContent = `P${data.index + 1} / ${data.total || 10}`;
@@ -350,7 +373,7 @@ socket.on('quiz_question', (data) => {
                         : 'w-full bg-gray-900 border border-gray-800 p-3 rounded-xl text-sm font-semibold text-left text-gray-600';
                 });
                 if (quizAnsweredMsg) quizAnsweredMsg.classList.remove('hidden');
-                if (quizCountdown) { clearInterval(quizCountdown); quizCountdown = null; }
+                // NOTA: o cronómetro continua — o utilizador mantém noção do tempo restante do grupo
             });
             quizOptions.appendChild(btn);
         });
@@ -375,6 +398,20 @@ socket.on('quiz_answer_result', (data) => {
 socket.on('quiz_timeout', () => {
     if (quizCountdown) { clearInterval(quizCountdown); quizCountdown = null; }
     lockQuizOptions();
+});
+
+// ── Fim antecipado: todos responderam ────────────────────────────────────────
+socket.on('quiz_early_end', () => {
+    if (quizCountdown) { clearInterval(quizCountdown); quizCountdown = null; }
+    if (quizTimerLabel) quizTimerLabel.textContent = '✓';
+    if (quizTimerBar)   { quizTimerBar.style.width = '100%'; quizTimerBar.className = 'h-full rounded-full bg-green-500 transition-all duration-300'; }
+    lockQuizOptions();
+    // Mostrar brevemente mensagem de todos responderam (se ainda não foi respondida pelo utilizador)
+    if (!quizSubmitted && quizAnsweredMsg) {
+        quizAnsweredMsg.textContent = '⚡ Todos responderam — a revelar resultados…';
+        quizAnsweredMsg.classList.remove('hidden', 'text-green-400');
+        quizAnsweredMsg.classList.add('text-blue-400');
+    }
 });
 
 // ── Results ───────────────────────────────────────────────────────────────────
