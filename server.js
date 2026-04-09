@@ -321,7 +321,7 @@ function revealQuizResults() {
 
 function buildLeaderboardData() {
     return Object.entries(gameState.users)
-        .filter(([, u]) => u.role === 'consumer')
+        //.filter(([, u]) => u.role === 'consumer')
         .map(([id, u]) => ({
             id, name: u.name || 'Anónimo', group: u.group,
             quizScore: u.quizScore || 0,
