@@ -318,7 +318,7 @@ socket.on('leaderboard_update', (entries) => {
         return `
             <div class="flex items-center justify-between bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm gap-2">
                 <span class="font-bold w-6 text-center shrink-0">${medalha}</span>
-                <span class="flex-1 text-gray-300 mono text-xs truncate">${e.id.slice(0, 8)}… <span class="text-blue-500">N${e.group}</span></span>
+                <span class="flex-1 font-bold truncate ${e.id === socket.id ? 'text-yellow-300' : 'text-white'}">${e.name || 'Anónimo'} <span class="text-blue-500 font-normal">N${e.group}</span></span>
                 <span class="text-green-400 font-black shrink-0">✅ ${e.compliance}</span>
                 <span class="${corHavoc} font-bold mono text-xs shrink-0">🔥 ${e.havoc}</span>
                 <span class="${corCarbon} mono text-xs shrink-0">🌿 ${e.carbon}g</span>
