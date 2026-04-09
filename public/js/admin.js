@@ -136,15 +136,7 @@ window.addEventListener('quiz_live_update', (e) => {
     });
 });
 
-// Auto-quiz countdown indicator
-const autoQuizNextLabel = document.getElementById('auto-quiz-next');
-let autoQuizCountdown = 120;
-setInterval(() => {
-    if (!autoQuizNextLabel) return;
-    autoQuizCountdown = Math.max(0, autoQuizCountdown - 1);
-    autoQuizNextLabel.textContent = `Próx. quiz auto: ${autoQuizCountdown}s`;
-    if (autoQuizCountdown === 0) autoQuizCountdown = 120;
-}, 1000);
+// (Auto-quiz desativado — perguntas lançadas manualmente pelo instrutor)
 
 // ─── Classificação em tempo real (painel admin) ────────────────────────────────
 const adminLeaderboardTable = document.getElementById('admin-leaderboard-table');

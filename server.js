@@ -169,7 +169,7 @@ let gameState = {
     carbonIntensity: 220,
 };
 
-let timerSeconds      = 600;
+let timerSeconds      = 360; // Cenário 1: 6 minutos
 let isGameRunning     = false;
 let pricingTick       = 0;
 let eventTimeline     = [];
@@ -180,9 +180,7 @@ let activeDrRequests  = {};
 let activeQuiz          = null;
 let quizAnswers         = {};
 let quizDeadlineTimeout = null;
-let autoQuizIndex       = 0;
 let questionsLaunched   = 0;
-let lastAutoQuizTime    = 0;
 
 // ─── Auxiliares ───────────────────────────────────────────────────────────────
 function syncClock(socket) {
@@ -237,9 +235,7 @@ function resetGameMetrics() {
     gameState.p2pMarket = [];
     activeDrRequests = {};
     eventTimeline = [];
-    autoQuizIndex = 0;
     questionsLaunched = 0;
-    lastAutoQuizTime = 0;
 
     if (quizDeadlineTimeout) { clearTimeout(quizDeadlineTimeout); quizDeadlineTimeout = null; }
     activeQuiz = null; quizAnswers = {};
@@ -262,7 +258,7 @@ function resetGameMetrics() {
         io.to(id).emit('quiz_reset'); // client resets quiz state
     }
 
-    timerSeconds = 600; isGameRunning = true; pricingTick = 0;
+    timerSeconds = 360; isGameRunning = true; pricingTick = 0;
     gameState.pricing = { ...PRICE_TIERS[1] };
     gameState.carbonIntensity = getCurrentCarbonIntensity();
     io.emit('price_update', gameState.pricing);
@@ -271,20 +267,18 @@ function resetGameMetrics() {
 }
 
 // ─── Quiz: lançar pergunta ─────────────────────────────────────────────────────
-function launchQuizQuestion(idx, isAuto = false) {
+function launchQuizQuestion(idx) {
     if (idx >= QUIZ_QUESTIONS.length) return;
     const q = QUIZ_QUESTIONS[idx];
     activeQuiz = { ...q, index: idx };
     quizAnswers = {};
     questionsLaunched++;
-    lastAutoQuizTime = Date.now();
 
     const deadline = Date.now() + 30000;
     io.emit('quiz_question', {
         question: q.question,
         options: q.options,
         index: idx,
-        isAuto,
         deadline,
         total: QUIZ_QUESTIONS.length,
     });
@@ -295,7 +289,7 @@ function launchQuizQuestion(idx, isAuto = false) {
         setTimeout(revealQuizResults, 500);
     }, 30000);
 
-    logEvent('quiz', `Quiz P${idx + 1} lançada${isAuto ? ' (auto)' : ' (manual)'}`);
+    logEvent('quiz', `Quiz P${idx + 1} lançada (manual)`);
 
     // After 5 questions show leaderboard popup to users
     if (questionsLaunched === 5) {
@@ -504,7 +498,7 @@ io.on('connection', (socket) => {
 
     // ── Quiz ──────────────────────────────────────────────────────────────────
     socket.on('admin_start_quiz', (data) => {
-        launchQuizQuestion(data.questionIndex % QUIZ_QUESTIONS.length, false);
+        launchQuizQuestion(data.questionIndex % QUIZ_QUESTIONS.length);
     });
 
     socket.on('admin_end_quiz', () => {
@@ -820,14 +814,6 @@ setInterval(() => {
     assignTasks(); checkTasks(); updatePricing();
     updateBatteries(); updateCarbonTracking();
     resolveDrVotes(); updateStability(); buildLeaderboard();
-
-    // Auto-quiz: launch every 120 seconds
-    if (autoQuizIndex < QUIZ_QUESTIONS.length && Date.now() - lastAutoQuizTime >= 120000 && lastAutoQuizTime > 0) {
-        launchQuizQuestion(autoQuizIndex, true);
-        autoQuizIndex++;
-    }
-    // Start auto-quiz clock after first second of game
-    if (lastAutoQuizTime === 0) lastAutoQuizTime = Date.now();
 
     io.emit('state_update', {
         ...gameState,
