@@ -321,7 +321,7 @@ function revealQuizResults() {
 
 function buildLeaderboardData() {
     return Object.entries(gameState.users)
-        //.filter(([, u]) => u.role === 'consumer')
+        .filter(([, u]) => u.role === 'consumer')
         .map(([id, u]) => ({
             id, name: u.name || 'Anónimo', group: u.group,
             quizScore: u.quizScore || 0,
@@ -339,8 +339,9 @@ io.on('connection', (socket) => {
     socket.on('register_user', (data) => {
         if (data.isAdmin) {
             syncClock(socket);
-            // Send current leaderboard to admin immediately
             socket.emit('admin_leaderboard_update', buildLeaderboardData());
+            // Signal client to enter spectator/manager view — admin is NOT a participant
+            socket.emit('admin_init', { scenario: gameState.scenario, scenarioName: SCENARIO_NAMES[gameState.scenario] });
         } else {
             assignRoleAndGroup(socket, data.name);
         }
@@ -516,8 +517,17 @@ io.on('connection', (socket) => {
         const counts = {};
         activeQuiz.options.forEach((_, i) => { counts[i] = 0; });
         Object.values(quizAnswers).forEach(a => { counts[a] = (counts[a] || 0) + 1; });
-        io.emit('quiz_live_votes', { counts, total: Object.keys(quizAnswers).length });
+        const answered = Object.keys(quizAnswers).length;
+        io.emit('quiz_live_votes', { counts, total: answered });
         io.emit('admin_leaderboard_update', buildLeaderboardData());
+
+        // Rapid-fire: se todos os consumidores ativos já responderam, revelar imediatamente
+        const activeConsumers = Object.values(gameState.users).filter(u => u.role === 'consumer').length;
+        if (activeConsumers > 0 && answered >= activeConsumers) {
+            if (quizDeadlineTimeout) { clearTimeout(quizDeadlineTimeout); quizDeadlineTimeout = null; }
+            io.emit('quiz_early_end'); // diz aos clientes para pararem o cronómetro
+            setTimeout(revealQuizResults, 400);
+        }
     });
 
     // ── Admin events ──────────────────────────────────────────────────────────
