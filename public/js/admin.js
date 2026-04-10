@@ -11,44 +11,144 @@ if (isAdmin) {
 }
 // Non-admin registration is handled in main.js after nickname entry
 
-// ─── Botões de cenário ────────────────────────────────────────────────────────
-const btnScen1 = document.getElementById('btn-start-scen1');
-const btnScen2 = document.getElementById('btn-start-scen2');
-const btnReset = document.getElementById('btn-reset');
+// ─── Botões de cenário e arranque ─────────────────────────────────────────────
+const btnScen1          = document.getElementById('btn-start-scen1');
+const btnScen2          = document.getElementById('btn-start-scen2');
+const btnReset          = document.getElementById('btn-reset');
+const btnIniciar        = document.getElementById('btn-iniciar-sessao');
 const adminCurrentScenario = document.getElementById('admin-current-scenario');
 
-btnScen1?.addEventListener('click', () => socket.emit('admin_change_scenario', 1));
-btnScen2?.addEventListener('click', () => socket.emit('admin_change_scenario', 2));
+let scenarioSelected = false;
+let sessionRunning   = false;
 
+function setScenarioButtonsActive(selectedId) {
+    // Destaca o cenário seleccionado
+    btnScen1?.classList.toggle('ring-2',   selectedId === 1);
+    btnScen1?.classList.toggle('ring-white', selectedId === 1);
+    btnScen2?.classList.toggle('ring-2',   selectedId === 2);
+    btnScen2?.classList.toggle('ring-blue-300', selectedId === 2);
+}
+
+// Seleccionar Rede Tradicional
+btnScen1?.addEventListener('click', () => {
+    if (sessionRunning) { showToast('⚠ Termina ou reinicia a sessão activa primeiro.', 'warning'); return; }
+    socket.emit('admin_select_scenario', 1);
+    setScenarioButtonsActive(1);
+    scenarioSelected = true;
+    if (btnIniciar) btnIniciar.classList.remove('hidden');
+    applyScenarioButtons(1);
+    showToast('⚡ Rede Tradicional seleccionada — clica em INICIAR SESSÃO quando estiveres pronto.', 'info');
+});
+
+// Seleccionar Rede Inteligente
+btnScen2?.addEventListener('click', () => {
+    if (sessionRunning) { showToast('⚠ Termina ou reinicia a sessão activa primeiro.', 'warning'); return; }
+    socket.emit('admin_select_scenario', 2);
+    setScenarioButtonsActive(2);
+    scenarioSelected = true;
+    if (btnIniciar) btnIniciar.classList.remove('hidden');
+    applyScenarioButtons(2);
+    showToast('🤖 Rede Inteligente seleccionada — clica em INICIAR SESSÃO quando estiveres pronto.', 'info');
+});
+
+// Iniciar sessão
+btnIniciar?.addEventListener('click', () => {
+    if (!scenarioSelected) { showToast('⚠ Selecciona primeiro um cenário.', 'warning'); return; }
+    socket.emit('admin_start_session');
+    sessionRunning = true;
+    if (btnIniciar) { btnIniciar.disabled = true; btnIniciar.textContent = '▶ SESSÃO EM CURSO'; btnIniciar.classList.replace('bg-green-700', 'bg-gray-600'); btnIniciar.classList.replace('border-green-500', 'border-gray-500'); }
+    showToast('▶ Sessão iniciada!', 'success');
+});
+
+// Reset total (estado de fábrica)
 btnReset?.addEventListener('click', () => {
-    if (confirm('Reiniciar todas as métricas e recomeçar o temporizador?')) socket.emit('admin_reset_game');
+    if (!confirm('⚠ REINICIAR TUDO?\n\nEsta acção apaga todos os utilizadores, pontuações e dados da sessão. Os alunos terão de voltar a entrar o nome.\n\nConfirmar?')) return;
+    socket.emit('admin_reset_game');
+    sessionRunning   = false;
+    scenarioSelected = false;
+    // Esconder e repor o botão INICIAR
+    if (btnIniciar) {
+        btnIniciar.classList.add('hidden');
+        btnIniciar.disabled = false;
+        btnIniciar.textContent = '▶ INICIAR SESSÃO';
+        btnIniciar.classList.replace('bg-gray-600',     'bg-green-700');
+        btnIniciar.classList.replace('border-gray-500', 'border-green-500');
+    }
+    setScenarioButtonsActive(null);
+    applyScenarioButtons(1); // repõe para S1 por omissão
+    showToast('🔄 Reset total efectuado. Selecciona um cenário para recomeçar.', 'warning');
+});
+
+// Quando a sessão termina naturalmente, repor botão INICIAR
+socket.on('simulation_ended', () => {
+    sessionRunning = false;
+    scenarioSelected = false;
+    if (btnIniciar) {
+        btnIniciar.disabled = false;
+        btnIniciar.textContent = '▶ INICIAR SESSÃO';
+        btnIniciar.classList.replace('bg-gray-600',     'bg-green-700');
+        btnIniciar.classList.replace('border-gray-500', 'border-green-500');
+    }
 });
 
 // ─── Controlo de botões por cenário (S2-only = renováveis) ────────────────────
 let activeScenarioId = 1;
 
 function applyScenarioButtons(id) {
-    activeScenarioId = id;
-    // Renewable buttons only shown in Scenario 2
+    activeScenarioId = id || 1;
+    // Botões de renováveis só visíveis no Cenário 2
     document.querySelectorAll('[data-s2-only]').forEach(el => {
         el.classList.toggle('hidden', id !== 2);
         el.disabled = id !== 2;
     });
     if (adminCurrentScenario) {
-        adminCurrentScenario.textContent = id === 1
+        if (!id) {
+            adminCurrentScenario.textContent = 'Nenhum cenário seleccionado';
+        } else if (!sessionRunning) {
+            adminCurrentScenario.textContent = id === 1
+                ? 'Cenário 1 — Rede Tradicional (pausado)'
+                : 'Cenário 2 — Rede Inteligente (pausado)';
+        } else {
+            adminCurrentScenario.textContent = id === 1
+                ? 'Cenário 1 — Rede Elétrica Tradicional'
+                : 'Cenário 2 — Rede Elétrica Inteligente';
+        }
+    }
+}
+
+// Cenário seleccionado (parado) — actualiza temporizador e painel
+socket.on('scenario_selected', (data) => {
+    applyScenarioButtons(data.id);
+    // Mostrar temporizador em modo parado
+    const timerEl = document.getElementById('timer');
+    if (timerEl) timerEl.textContent = data.timerDisplay;
+});
+
+// Sessão iniciada
+socket.on('session_started', (data) => {
+    sessionRunning = true;
+    applyScenarioButtons(data.scenario);
+    if (adminCurrentScenario) {
+        adminCurrentScenario.textContent = data.scenario === 1
             ? 'Cenário 1 — Rede Elétrica Tradicional'
             : 'Cenário 2 — Rede Elétrica Inteligente';
     }
-    // Highlight active scenario button
-    btnScen1?.classList.toggle('ring-2', id === 1);
-    btnScen1?.classList.toggle('ring-white', id === 1);
-    btnScen2?.classList.toggle('ring-2', id === 2);
-    btnScen2?.classList.toggle('ring-blue-400', id === 2);
-}
+});
 
+// scenario_changed ainda é emitido (compatibilidade) — resync painel
 socket.on('scenario_changed', (data) => {
     const id = data.id || data;
-    applyScenarioButtons(id);
+    if (sessionRunning) applyScenarioButtons(id);
+});
+
+// Reset total — repor tudo no painel do instrutor
+socket.on('full_reset', () => {
+    sessionRunning   = false;
+    scenarioSelected = false;
+    applyScenarioButtons(null);
+    if (adminCurrentScenario) adminCurrentScenario.textContent = 'Nenhum cenário seleccionado';
+    const timerEl = document.getElementById('timer');
+    if (timerEl) timerEl.textContent = '6:00';
 });
 
 // Apply on load (default S1)
