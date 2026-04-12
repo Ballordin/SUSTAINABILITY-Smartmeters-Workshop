@@ -166,43 +166,48 @@ socket.on('scenario_changed', (data) => {
 // ─── Relógio ──────────────────────────────────────────────────────────────────
 socket.on('time_update', (t) => { if (timerDisplay) timerDisplay.textContent = t; });
 
+// ─── Reset total (wipe de todos os dados) ─────────────────────────────────────
+socket.on('full_reset', () => {
+    consumerView?.classList.add('hidden');
+    managerView?.classList.add('hidden');
+    resultsView?.classList.add('hidden');
+
+    if (loadingScreen) {
+        loadingScreen.classList.remove('hidden');
+        loadingScreen.innerHTML = `
+            <div class="text-center">
+                <div class="text-5xl mb-4 animate-pulse">🔄</div>
+                <p class="text-white font-black text-xl mb-1">Sessão Reiniciada</p>
+                <p class="text-gray-500 mb-6">Aguarda que o instrutor inicie uma nova sessão…</p>
+                <div class="flex gap-2 justify-center">
+                    <span class="w-2 h-2 rounded-full bg-purple-500 animate-bounce" style="animation-delay:0s"></span>
+                    <span class="w-2 h-2 rounded-full bg-purple-500 animate-bounce" style="animation-delay:.15s"></span>
+                    <span class="w-2 h-2 rounded-full bg-purple-500 animate-bounce" style="animation-delay:.3s"></span>
+                </div>
+            </div>`;
+    }
+
+    // Reregistar automaticamente para repor papel/grupo assim que a sessão começar
+    if (isAdminView) {
+        socket.emit('register_user', { isAdmin: true, name: 'Instrutor' });
+    } else if (myName) {
+        socket.emit('register_user', { isAdmin: false, name: myName });
+    } else {
+        // Sem nome guardado — mostrar modal de nickname novamente
+        if (loadingScreen) loadingScreen.classList.add('hidden');
+        if (nicknameModal) nicknameModal.classList.remove('hidden');
+    }
+});
+
+// ─── Sessão iniciada ──────────────────────────────────────────────────────────
+socket.on('session_started', (data) => {
+    if (!isAdminView) {
+        showToast(`▶ A sessão começou! Cenário ${data.scenario} — Boa sorte!`, 'success');
+    }
+});
+
 // ─── Troca de papéis ──────────────────────────────────────────────────────────
 socket.on('role_swap_alert', (data) => showToast(data.message, 'warning'));
-
-// ─── Cenário seleccionado (sessão ainda pausada) ───────────────────────────────
-socket.on('scenario_selected', (data) => {
-    currentScenario = data.id;
-    const cor = data.id === 1 ? 'text-blue-400' : 'text-green-400';
-    if (scenarioTitle) scenarioTitle.innerHTML = `Cenário ${data.id}: <span class="${cor}">${data.name}</span>`;
-    if (timerDisplay) timerDisplay.textContent = data.timerDisplay;
-    // Alunos vêem o cenário preparado mas o jogo ainda não arrancou
-    if (!isAdminView) showToast(`⏸ ${data.name} preparado — aguarda o início da sessão.`, 'info');
-    window.dispatchEvent(new CustomEvent('scenario_switched', { detail: data.id }));
-});
-
-// ─── Sessão iniciada pelo instrutor ───────────────────────────────────────────
-socket.on('session_started', (data) => {
-    if (!isAdminView) showToast(`▶ Sessão iniciada — ${data.name}`, 'success');
-});
-
-// ─── Reset total (estado de fábrica) ──────────────────────────────────────────
-socket.on('full_reset', () => {
-    if (isAdminView) return; // admin.js trata o seu próprio estado
-    // Alunos voltam ao ecrã de entrada de nome
-    myRole = 'consumer'; myGroup = 1; currentScenario = 1; isPowered = true;
-    if (consumerView)  consumerView.classList.add('hidden');
-    if (managerView)   managerView.classList.add('hidden');
-    if (resultsView)   resultsView.classList.add('hidden');
-    if (loadingScreen) loadingScreen.classList.add('hidden');
-    // Mostrar de novo o modal de nickname
-    const nm = document.getElementById('nickname-modal');
-    const ni = document.getElementById('nickname-input');
-    const ne = document.getElementById('nickname-error');
-    if (nm) { nm.classList.remove('hidden'); }
-    if (ni) ni.value = '';
-    if (ne) ne.classList.add('hidden');
-    showToast('🔄 A sessão foi reiniciada pelo instrutor. Volta a entrar o teu nome.', 'warning');
-});
 
 // ─── Eventos de rede ─────────────────────────────────────────────────────────
 socket.on('grid_event', (data) => showToast(data.message, 'warning'));
@@ -379,8 +384,9 @@ function lockQuizOptions() {
 // ── New question arrives ──────────────────────────────────────────────────────
 socket.on('quiz_question', (data) => {
     // BUG FIX: always reset state before showing new question
+    if (isAdminView) return;
+    
     resetQuizState();
-
     if (!quizModal) return;
     if (quizQuestionText) quizQuestionText.textContent = data.question;
     if (quizProgressLabel) quizProgressLabel.textContent = `P${data.index + 1} / ${data.total || 10}`;

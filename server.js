@@ -169,14 +169,13 @@ let gameState = {
     carbonIntensity: 220,
 };
 
-let timerSeconds         = 360; // actualizado ao seleccionar cenário
-let isGameRunning        = false;
-let pricingTick          = 0;
-let roleSwapDone         = false;   // troca ocorre apenas uma vez por sessão
-let sessionTotalSeconds  = 360;     // duração total do cenário activo
+let timerSeconds      = 360; // Cenário 1: 6 minutos
+let isGameRunning     = false;
+let pricingTick       = 0;
 let eventTimeline     = [];
 let scenarioSnapshots = {};
 let activeDrRequests  = {};
+let roleSwapDone      = false; // garante troca única por sessão
 
 // Quiz state
 let activeQuiz          = null;
@@ -191,7 +190,8 @@ function syncClock(socket) {
 }
 
 function logEvent(type, message, group = null) {
-    eventTimeline.push({ time: 600 - timerSeconds, type, message, group });
+    const totalTime = gameState.scenario === 1 ? 360 : 600;
+    eventTimeline.push({ time: totalTime - timerSeconds, type, message, group });
 }
 
 function getCurrentCarbonIntensity() {
@@ -225,7 +225,6 @@ function assignRoleAndGroup(socket, name) {
     syncClock(socket);
 }
 
-// ─── Soft reset (mantém utilizadores, recomeça métricas e temporizador) ──────
 function resetGameMetrics() {
     gameState.metrics = {
         outages: 0, callsMade: 0, issuesResolved: 0,
@@ -239,7 +238,6 @@ function resetGameMetrics() {
     activeDrRequests = {};
     eventTimeline = [];
     questionsLaunched = 0;
-    roleSwapDone = false;
 
     if (quizDeadlineTimeout) { clearTimeout(quizDeadlineTimeout); quizDeadlineTimeout = null; }
     activeQuiz = null; quizAnswers = {};
@@ -259,68 +257,28 @@ function resetGameMetrics() {
         io.to(id).emit('carbon_update', { intensity: getCurrentCarbonIntensity(), footprint: 0, hourlyRate: 0 });
         io.to(id).emit('p2p_market_update', []);
         io.to(id).emit('schedules_update', []);
-        io.to(id).emit('quiz_reset');
+        io.to(id).emit('quiz_reset'); // client resets quiz state
     }
 
-    sessionTotalSeconds = gameState.scenario === 1 ? 360 : 600;
-    timerSeconds = sessionTotalSeconds;
-    isGameRunning = false; // ← parado até admin_start_session
-    pricingTick = 0;
+    timerSeconds = gameState.scenario === 1 ? 360 : 600;
+    isGameRunning = false; pricingTick = 0;
     gameState.pricing = { ...PRICE_TIERS[1] };
     gameState.carbonIntensity = getCurrentCarbonIntensity();
     io.emit('price_update', gameState.pricing);
     io.emit('p2p_market_update', []);
     io.emit('stability_update', 100);
-
-    // Sincroniza o temporizador em modo parado
-    const m = Math.floor(timerSeconds / 60), s = timerSeconds % 60;
-    io.emit('time_update', `${m}:${s < 10 ? '0' : ''}${s}`);
 }
 
-// ─── Reset total (estado de fábrica — apaga todos os utilizadores) ────────────
-function deepResetAll() {
-    isGameRunning = false;
+// ─── Iniciar sessão (separado do reset de métricas) ───────────────────────────
+function startSession() {
+    timerSeconds = gameState.scenario === 1 ? 360 : 600;
+    isGameRunning = true;
+    pricingTick   = 0;
     roleSwapDone  = false;
-
-    if (quizDeadlineTimeout) { clearTimeout(quizDeadlineTimeout); quizDeadlineTimeout = null; }
-    activeQuiz = null; quizAnswers = {};
-
-    // Notificar todos os clientes antes de limpar
-    io.emit('full_reset');
-
-    // Limpar todos os utilizadores e gestores
-    gameState.users    = {};
-    gameState.managers = [];
-
-    // Reiniciar grupos
-    for (let i = 1; i <= 4; i++) gameState.groups[i] = { capacity: 1000, currentLoad: 0, shed: false };
-
-    // Reiniciar métricas
-    gameState.metrics = {
-        outages: 0, callsMade: 0, issuesResolved: 0,
-        totalPower: 0, drAccepted: 0,
-        totalCO2: 0, stabilityScore: 100,
-    };
-    gameState.solarModifier = 1.0;
-    gameState.renewableEvent = null;
-    gameState.p2pMarket = [];
-    activeDrRequests = {};
-    eventTimeline = [];
-    scenarioSnapshots = {};
-    questionsLaunched = 0;
-    pricingTick = 0;
-    gameState.pricing = { ...PRICE_TIERS[1] };
-    gameState.carbonIntensity = CARBON_S1;
-    gameState.scenario = 1; // repõe para Cenário 1 por omissão
-
-    sessionTotalSeconds = 360;
-    timerSeconds = 360;
-
-    io.emit('price_update', gameState.pricing);
-    io.emit('p2p_market_update', []);
-    io.emit('stability_update', 100);
     const m = Math.floor(timerSeconds / 60), s = timerSeconds % 60;
     io.emit('time_update', `${m}:${s < 10 ? '0' : ''}${s}`);
+    io.emit('session_started', { scenario: gameState.scenario, scenarioName: SCENARIO_NAMES[gameState.scenario] });
+    logEvent('balance', 'Sessão iniciada pelo instrutor');
 }
 
 // ─── Quiz: lançar pergunta ─────────────────────────────────────────────────────
@@ -377,7 +335,6 @@ function revealQuizResults() {
 
 function buildLeaderboardData() {
     return Object.entries(gameState.users)
-        .filter(([, u]) => u.role === 'consumer')
         .map(([id, u]) => ({
             id, name: u.name || 'Anónimo', group: u.group,
             quizScore: u.quizScore || 0,
@@ -563,23 +520,26 @@ io.on('connection', (socket) => {
 
     socket.on('quiz_answer', (data) => {
         if (!activeQuiz || quizAnswers[socket.id] !== undefined) return;
-        quizAnswers[socket.id] = data.answer;
         const user = gameState.users[socket.id];
+        if (!user) return;
+        
+        quizAnswers[socket.id] = data.answer;
         const isCorrect = data.answer === activeQuiz.correct;
-        if (user) {
-            if (isCorrect) user.quizScore = (user.quizScore || 0) + 10;
-            socket.emit('quiz_answer_result', { correct: isCorrect, newScore: user.quizScore || 0 });
-        }
+
+        if (isCorrect) user.quizScore = (user.quizScore || 0) + 10;
+        socket.emit('quiz_answer_result', { correct: isCorrect, newScore: user.quizScore || 0 });
+
         const counts = {};
         activeQuiz.options.forEach((_, i) => { counts[i] = 0; });
         Object.values(quizAnswers).forEach(a => { counts[a] = (counts[a] || 0) + 1; });
         const answered = Object.keys(quizAnswers).length;
+
         io.emit('quiz_live_votes', { counts, total: answered });
         io.emit('admin_leaderboard_update', buildLeaderboardData());
 
-        // Rapid-fire: se todos os consumidores ativos já responderam, revelar imediatamente
-        const activeConsumers = Object.values(gameState.users).filter(u => u.role === 'consumer').length;
-        if (activeConsumers > 0 && answered >= activeConsumers) {
+        // Exclui apenas quem não está na lista 'users' (Admins)
+        const totalParticipants = Object.keys(gameState.users).length;
+        if (totalParticipants > 0 && answered >= totalParticipants) {
             if (quizDeadlineTimeout) { clearTimeout(quizDeadlineTimeout); quizDeadlineTimeout = null; }
             io.emit('quiz_early_end'); // diz aos clientes para pararem o cronómetro
             setTimeout(revealQuizResults, 400);
@@ -587,33 +547,68 @@ io.on('connection', (socket) => {
     });
 
     // ── Admin events ──────────────────────────────────────────────────────────
-    // Seleccionar cenário (apenas define, não inicia)
-    socket.on('admin_select_scenario', (id) => {
-        if (isGameRunning) return; // não muda enquanto jogo activo
-        scenarioSnapshots[gameState.scenario] = { metrics: { ...gameState.metrics }, scenario: gameState.scenario, name: SCENARIO_NAMES[gameState.scenario] };
+    socket.on('admin_change_scenario', (id) => {
+        // Guardar snapshot do cenário atual se a sessão estava em curso
+        if (isGameRunning) {
+            scenarioSnapshots[gameState.scenario] = {
+                metrics: { ...gameState.metrics },
+                scenario: gameState.scenario,
+                name: SCENARIO_NAMES[gameState.scenario],
+            };
+        }
+        isGameRunning      = false;
         gameState.scenario = id;
-        sessionTotalSeconds = id === 1 ? 360 : 600;
-        timerSeconds = sessionTotalSeconds;
+        timerSeconds       = id === 1 ? 360 : 600;
+        resetGameMetrics();
+        // Enviar temporizador parado para todos os clientes
+        const m = Math.floor(timerSeconds / 60), s = timerSeconds % 60;
+        io.emit('time_update', `${m}:${s < 10 ? '0' : ''}${s}`);
+        io.emit('scenario_changed', { id, name: SCENARIO_NAMES[id] });
+    });
+
+    socket.on('admin_start_session', () => {
+        if (isGameRunning) return; // já em curso — ignorar
+        startSession();
+    });
+
+    socket.on('admin_reset_game', () => {
+        // ── Paragem total ──────────────────────────────────────────────────────
         isGameRunning = false;
         roleSwapDone  = false;
+
+        // ── Limpar todos os utilizadores (papéis, grupos, pontuações) ──────────
+        gameState.users    = {};
+        gameState.managers = [];
+
+        // ── Repor estado do jogo ───────────────────────────────────────────────
+        gameState.scenario       = 1;
+        gameState.solarModifier  = 1.0;
+        gameState.renewableEvent = null;
+        gameState.p2pMarket      = [];
+        gameState.pricing        = { ...PRICE_TIERS[1] };
+        gameState.carbonIntensity = CARBON_S1;
+        for (let i = 1; i <= 4; i++) gameState.groups[i] = { capacity: 1000, currentLoad: 0, shed: false };
+        gameState.metrics = { outages: 0, callsMade: 0, issuesResolved: 0, totalPower: 0, drAccepted: 0, totalCO2: 0, stabilityScore: 100 };
+
+        // ── Limpar estado de quiz e eventos ────────────────────────────────────
+        activeDrRequests  = {};
+        eventTimeline     = [];
+        scenarioSnapshots = {};
+        questionsLaunched = 0;
+        pricingTick       = 0;
+        if (quizDeadlineTimeout) { clearTimeout(quizDeadlineTimeout); quizDeadlineTimeout = null; }
+        activeQuiz = null; quizAnswers = {};
+
+        // ── Repor temporizador (C1 = 6 min) ───────────────────────────────────
+        timerSeconds = 360;
         const m = Math.floor(timerSeconds / 60), s = timerSeconds % 60;
-        io.emit('scenario_selected', { id, name: SCENARIO_NAMES[id], timerDisplay: `${m}:${s < 10 ? '0' : ''}${s}` });
-    });
 
-    // Iniciar sessão (arranca o temporizador e o jogo)
-    socket.on('admin_start_session', () => {
-        if (isGameRunning) return;
-        resetGameMetrics();        // repõe dados sem apagar utilizadores
-        isGameRunning = true;      // ← único lugar onde o jogo arranca
-        io.emit('session_started', { scenario: gameState.scenario, name: SCENARIO_NAMES[gameState.scenario] });
-        // Sincroniza painéis dos alunos
-        io.emit('scenario_changed', { id: gameState.scenario, name: SCENARIO_NAMES[gameState.scenario] });
-        logEvent('start', `Sessão iniciada — Cenário ${gameState.scenario}`);
-    });
-
-    // Reset total (estado de fábrica)
-    socket.on('admin_reset_game', () => {
-        deepResetAll();
+        // ── Notificar todos os clientes ────────────────────────────────────────
+        io.emit('full_reset');
+        io.emit('time_update', `${m}:${s < 10 ? '0' : ''}${s}`);
+        io.emit('price_update', gameState.pricing);
+        io.emit('stability_update', 100);
+        io.emit('p2p_market_update', []);
     });
 
     socket.on('admin_inject_event', (data) => {
@@ -888,15 +883,6 @@ setInterval(() => {
     updateBatteries(); updateCarbonTracking();
     resolveDrVotes(); updateStability(); buildLeaderboard();
 
-    // Troca de papéis a meio da sessão (uma vez por sessão)
-    const halfTime = Math.floor(sessionTotalSeconds / 2);
-    if (!roleSwapDone && timerSeconds === halfTime) {
-        roleSwapDone = true;
-        io.emit('role_swap_alert', { message: '🔄 Troca de papéis em 5 segundos!' });
-        setTimeout(rotateManagers, 5000);
-        logEvent('swap', `Troca de papéis a meio da sessão (${halfTime}s)`);
-    }
-
     io.emit('state_update', {
         ...gameState,
         metrics: {
@@ -909,6 +895,16 @@ setInterval(() => {
     timerSeconds--;
     const m = Math.floor(timerSeconds / 60), s = timerSeconds % 60;
     io.emit('time_update', `${m}:${s < 10 ? '0' : ''}${s}`);
+
+    // ── Troca de papéis a meio da sessão (uma única vez) ──────────────────────
+    const halfTime = gameState.scenario === 1 ? 180 : 300;
+    if (!roleSwapDone && timerSeconds === halfTime + 5) {
+        io.emit('role_swap_alert', { message: '🔄 Troca de papéis em 5 segundos!' });
+    }
+    if (!roleSwapDone && timerSeconds === halfTime) {
+        rotateManagers();
+        roleSwapDone = true;
+    }
 
     if (timerSeconds <= 0) {
         isGameRunning = false;
