@@ -337,6 +337,7 @@ function buildLeaderboardData() {
     return Object.entries(gameState.users)
         .map(([id, u]) => ({
             id, name: u.name || 'Anónimo', group: u.group,
+            role: u.role || 'consumer',
             quizScore: u.quizScore || 0,
             compliance: u.compliance || 0,
             havoc: u.havoc || 0,

@@ -18,6 +18,7 @@ let quizSubmitted      = false;
 const loadingScreen  = document.getElementById('loading-screen');
 const consumerView   = document.getElementById('consumer-view');
 const managerView    = document.getElementById('manager-view');
+const adminStatusView= document.getElementById('admin-status-view');
 const resultsView    = document.getElementById('results-view');
 const scenarioTitle  = document.getElementById('scenario-title');
 const timerDisplay   = document.getElementById('timer');
@@ -54,14 +55,13 @@ const nicknameBtn    = document.getElementById('nickname-submit-btn');
 const nicknameError  = document.getElementById('nickname-error');
 
 if (isAdminView) {
-    // Instrutor: salta nickname modal, entra directamente na vista de espectador/gestor
+    // Instrutor: salta nickname modal, entra na vista de controlo exclusiva
     if (nicknameModal) nicknameModal.classList.add('hidden');
     if (loadingScreen) loadingScreen.classList.add('hidden');
-    // Definir papel como gestor localmente — admin não é um participante
     myRole = 'manager';
-    if (consumerView) consumerView.classList.add('hidden');
-    if (managerView)  managerView.classList.remove('hidden');
-    applyScenarioPanels(1); // padrão Cenário 1 até receber admin_init
+    if (consumerView)   consumerView.classList.add('hidden');
+    if (managerView)    managerView.classList.add('hidden');
+    if (adminStatusView) adminStatusView.classList.remove('hidden');
 } else {
     // Alunos: mostrar modal de nome
     if (nicknameModal) nicknameModal.classList.remove('hidden');
@@ -100,10 +100,10 @@ function applyScenarioPanels(id) {
 socket.on('admin_init', (data) => {
     currentScenario = data.scenario;
     myRole = 'manager';
-    if (consumerView) consumerView.classList.add('hidden');
-    if (managerView)  managerView.classList.remove('hidden');
-    if (loadingScreen) loadingScreen.classList.add('hidden');
-    applyScenarioPanels(data.scenario);
+    if (consumerView)    consumerView.classList.add('hidden');
+    if (managerView)     managerView.classList.add('hidden');
+    if (adminStatusView) adminStatusView.classList.remove('hidden');
+    if (loadingScreen)   loadingScreen.classList.add('hidden');
     const cor = data.scenario === 1 ? 'text-blue-400' : 'text-green-400';
     if (scenarioTitle) scenarioTitle.innerHTML = `Cenário ${data.scenario}: <span class="${cor}">${data.scenarioName}</span>`;
 });
@@ -145,11 +145,13 @@ socket.on('scenario_changed', (data) => {
     if (scenarioTitle) scenarioTitle.innerHTML = `Cenário ${id}: <span class="${cor}">${name}</span>`;
 
     if (isAdminView) {
-        // Instrutor mantém sempre a vista de gestor — nunca muda para consumidor
+        // Instrutor mantém sempre a vista de controlo — nunca muda para consumidor/gestor
         myRole = 'manager';
-        consumerView?.classList.add('hidden');
-        managerView?.classList.remove('hidden');
-        applyScenarioPanels(id);
+        if (consumerView)    consumerView.classList.add('hidden');
+        if (managerView)     managerView.classList.add('hidden');
+        if (adminStatusView) adminStatusView.classList.remove('hidden');
+        const cor = id === 1 ? 'text-blue-400' : 'text-green-400';
+        if (scenarioTitle) scenarioTitle.innerHTML = `Cenário ${id}: <span class="${cor}">${name}</span>`;
         showToast(`Cenário ${id}: ${name}`, 'info');
         window.dispatchEvent(new CustomEvent('scenario_switched', { detail: id }));
         return;
@@ -172,6 +174,14 @@ socket.on('full_reset', () => {
     managerView?.classList.add('hidden');
     resultsView?.classList.add('hidden');
 
+    if (isAdminView) {
+        // Instrutor permanece na sua vista de controlo
+        if (adminStatusView) adminStatusView.classList.remove('hidden');
+        if (loadingScreen)   loadingScreen.classList.add('hidden');
+        socket.emit('register_user', { isAdmin: true, name: 'Instrutor' });
+        return;
+    }
+
     if (loadingScreen) {
         loadingScreen.classList.remove('hidden');
         loadingScreen.innerHTML = `
@@ -187,13 +197,9 @@ socket.on('full_reset', () => {
             </div>`;
     }
 
-    // Reregistar automaticamente para repor papel/grupo assim que a sessão começar
-    if (isAdminView) {
-        socket.emit('register_user', { isAdmin: true, name: 'Instrutor' });
-    } else if (myName) {
+    if (myName) {
         socket.emit('register_user', { isAdmin: false, name: myName });
     } else {
-        // Sem nome guardado — mostrar modal de nickname novamente
         if (loadingScreen) loadingScreen.classList.add('hidden');
         if (nicknameModal) nicknameModal.classList.remove('hidden');
     }
@@ -521,3 +527,93 @@ socket.on('show_leaderboard_popup', (entries) => {
 });
 
 if (leaderboardPopupClose) leaderboardPopupClose.addEventListener('click', () => leaderboardPopup?.classList.add('hidden'));
+
+// ─── Vista do Instrutor — atualização de dados ────────────────────────────────
+if (isAdminView) {
+
+    // Espelho do relógio
+    socket.on('time_update', (t) => {
+        const el = document.getElementById('admin-timer-mirror');
+        if (el) el.textContent = t;
+    });
+
+    // Estado da sessão (INICIAR SESSÃO / A DECORRER)
+    socket.on('session_started', () => {
+        const el = document.getElementById('admin-session-state');
+        if (el) { el.textContent = '▶ A Decorrer'; el.className = 'font-black text-lg text-green-400'; }
+    });
+    socket.on('full_reset', () => {
+        const el = document.getElementById('admin-session-state');
+        if (el) { el.textContent = '⏸ Pausa'; el.className = 'font-black text-lg text-yellow-400'; }
+    });
+    socket.on('scenario_changed', () => {
+        const el = document.getElementById('admin-session-state');
+        if (el) { el.textContent = '⏸ Pausa'; el.className = 'font-black text-lg text-yellow-400'; }
+    });
+
+    // Métricas em tempo real via state_update
+    socket.on('state_update', (state) => {
+        const m = state.metrics || {};
+        const set = (id, val) => { const e = document.getElementById(id); if (e) e.textContent = val; };
+
+        set('adm-outages',  m.outages   || 0);
+        set('adm-calls',    m.callsMade || 0);
+        set('adm-resolved', m.issuesResolved || 0);
+        set('adm-dr',       m.drAccepted || 0);
+        set('adm-co2',      (m.totalCO2 || 0) >= 1000
+            ? `${((m.totalCO2 || 0) / 1000).toFixed(1)} kg`
+            : `${Math.round(m.totalCO2 || 0)} g`);
+        set('adm-power',    (m.totalPower || 0) >= 1000
+            ? `${((m.totalPower || 0) / 1000).toFixed(1)} kW`
+            : `${Math.round(m.totalPower || 0)} W`);
+
+        const stabEl = document.getElementById('admin-stability-mirror');
+        if (stabEl) {
+            const sc = Math.round(m.stabilityScore || 100);
+            stabEl.textContent = `${sc}%`;
+            stabEl.className = `mono font-black text-2xl ${sc > 70 ? 'text-green-400' : sc > 40 ? 'text-yellow-400' : 'text-red-400'}`;
+        }
+
+        // Nós da rede
+        const grid = document.getElementById('admin-nodes-grid');
+        if (grid && state.groups) {
+            grid.innerHTML = Object.entries(state.groups).map(([id, g]) => {
+                const pct = g.capacity > 0 ? Math.round((g.currentLoad / g.capacity) * 100) : 0;
+                const col = g.shed ? 'border-purple-700 bg-purple-950/40' : pct > 95 ? 'border-red-700 bg-red-950/40' : pct > 75 ? 'border-yellow-700 bg-yellow-950/30' : 'border-gray-700 bg-gray-950/40';
+                const barCol = g.shed ? 'bg-purple-500' : pct > 95 ? 'bg-red-500' : pct > 75 ? 'bg-yellow-500' : 'bg-green-500';
+                const label = g.shed ? '✂️ Corte' : `${pct}%`;
+                return `<div class="border ${col} rounded-xl p-3 text-center">
+                    <p class="text-gray-500 text-xs uppercase tracking-wider mb-1">Nó ${id}</p>
+                    <p class="mono font-black text-xl ${g.shed ? 'text-purple-400' : pct > 95 ? 'text-red-400' : pct > 75 ? 'text-yellow-400' : 'text-green-400'}">${label}</p>
+                    <div class="mt-2 bg-gray-800 rounded-full h-1.5 overflow-hidden">
+                        <div class="${barCol} h-1.5 rounded-full transition-all duration-500" style="width:${Math.min(100, pct)}%"></div>
+                    </div>
+                    <p class="text-gray-700 text-xs mt-1 mono">${Math.round(g.currentLoad)}/${g.capacity}</p>
+                </div>`;
+            }).join('');
+        }
+    });
+
+    // Classificação expandida com coluna de papel
+    socket.on('admin_leaderboard_update', (entries) => {
+        const tbody = document.getElementById('admin-status-leaderboard');
+        const countEl = document.getElementById('admin-participant-count');
+        if (countEl) countEl.textContent = entries.length;
+        if (!tbody) return;
+        if (entries.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" class="text-center text-gray-600 py-6">Sem participantes ainda</td></tr>';
+            return;
+        }
+        tbody.innerHTML = entries.map((e, i) => `
+            <tr class="border-b border-gray-800 hover:bg-gray-800/50 transition-colors">
+                <td class="px-3 py-2 text-center font-black text-gray-400">${i + 1}</td>
+                <td class="px-3 py-2 font-bold text-white truncate max-w-[120px]">${e.name}</td>
+                <td class="px-3 py-2 text-center text-blue-400 mono">N${e.group}</td>
+                <td class="px-3 py-2 text-center text-xs ${e.role === 'manager' ? 'text-orange-400' : 'text-gray-400'}">${e.role === 'manager' ? '🎛️ Gestor' : '🏠 Cons.'}</td>
+                <td class="px-3 py-2 text-center font-black ${e.quizScore > 0 ? 'text-violet-400' : 'text-gray-600'} mono">📝 ${e.quizScore}</td>
+                <td class="px-3 py-2 text-center text-green-400 mono">✅ ${e.compliance}</td>
+                <td class="px-3 py-2 text-center ${e.havoc > 30 ? 'text-red-400' : 'text-gray-500'} mono">🔥 ${e.havoc}</td>
+            </tr>
+        `).join('');
+    });
+}

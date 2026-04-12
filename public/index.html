@@ -179,6 +179,98 @@
 </div>
 
 <!-- ═══════════════════════════════════════════
+     VISTA DO INSTRUTOR (apenas admin)
+════════════════════════════════════════════ -->
+<div id="admin-status-view" class="hidden max-w-5xl mx-auto px-4 pt-6 pb-12">
+
+    <!-- Estado da sessão -->
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+        <div class="bg-gray-900 border border-gray-800 rounded-xl p-4 text-center">
+            <p class="text-gray-500 text-xs uppercase tracking-wider mb-1">Estado</p>
+            <p id="admin-session-state" class="font-black text-lg text-yellow-400">⏸ Pausa</p>
+        </div>
+        <div class="bg-gray-900 border border-gray-800 rounded-xl p-4 text-center">
+            <p class="text-gray-500 text-xs uppercase tracking-wider mb-1">Tempo</p>
+            <p id="admin-timer-mirror" class="mono font-black text-2xl text-yellow-400">–:––</p>
+        </div>
+        <div class="bg-gray-900 border border-gray-800 rounded-xl p-4 text-center">
+            <p class="text-gray-500 text-xs uppercase tracking-wider mb-1">Participantes</p>
+            <p id="admin-participant-count" class="mono font-black text-2xl text-blue-400">0</p>
+        </div>
+        <div class="bg-gray-900 border border-gray-800 rounded-xl p-4 text-center">
+            <p class="text-gray-500 text-xs uppercase tracking-wider mb-1">Estabilidade</p>
+            <p id="admin-stability-mirror" class="mono font-black text-2xl text-green-400">100%</p>
+        </div>
+    </div>
+
+    <!-- Métricas em tempo real -->
+    <div class="bg-gray-900 border border-gray-800 rounded-xl p-4 mb-6">
+        <p class="text-gray-500 text-xs font-black uppercase tracking-widest mb-3">📊 Métricas da Sessão</p>
+        <div class="grid grid-cols-3 sm:grid-cols-6 gap-3 text-center">
+            <div>
+                <p class="text-red-400 text-2xl font-black mono" id="adm-outages">0</p>
+                <p class="text-gray-600 text-xs mt-1">Apagões</p>
+            </div>
+            <div>
+                <p class="text-yellow-400 text-2xl font-black mono" id="adm-calls">0</p>
+                <p class="text-gray-600 text-xs mt-1">Chamadas</p>
+            </div>
+            <div>
+                <p class="text-green-400 text-2xl font-black mono" id="adm-resolved">0</p>
+                <p class="text-gray-600 text-xs mt-1">Resolvidos</p>
+            </div>
+            <div>
+                <p class="text-blue-400 text-2xl font-black mono" id="adm-dr">0</p>
+                <p class="text-gray-600 text-xs mt-1">RP Aceites</p>
+            </div>
+            <div>
+                <p class="text-emerald-400 text-2xl font-black mono" id="adm-co2">0 g</p>
+                <p class="text-gray-600 text-xs mt-1">CO₂ Total</p>
+            </div>
+            <div>
+                <p class="text-purple-400 text-2xl font-black mono" id="adm-power">0 W</p>
+                <p class="text-gray-600 text-xs mt-1">Carga Total</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Nós da rede -->
+    <div class="bg-gray-900 border border-gray-800 rounded-xl p-4 mb-6">
+        <p class="text-gray-500 text-xs font-black uppercase tracking-widest mb-3">🔌 Nós da Rede</p>
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3" id="admin-nodes-grid">
+            <!-- preenchido via JS -->
+        </div>
+    </div>
+
+    <!-- Classificação completa -->
+    <div class="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
+        <p class="text-gray-500 text-xs font-black uppercase tracking-widest px-4 pt-4 pb-2">🏆 Classificação em Tempo Real</p>
+        <div class="overflow-x-auto">
+            <table class="w-full text-xs">
+                <thead>
+                    <tr class="bg-gray-800 border-b border-gray-700">
+                        <th class="px-3 py-2 text-center text-gray-400">#</th>
+                        <th class="px-3 py-2 text-left text-gray-300">Nome</th>
+                        <th class="px-3 py-2 text-center text-blue-400">Nó</th>
+                        <th class="px-3 py-2 text-center text-purple-400">Papel</th>
+                        <th class="px-3 py-2 text-center text-violet-400">Quiz</th>
+                        <th class="px-3 py-2 text-center text-green-400">Cumprim.</th>
+                        <th class="px-3 py-2 text-center text-red-400">Havoc</th>
+                    </tr>
+                </thead>
+            </table>
+            <div class="max-h-72 overflow-y-auto">
+                <table class="w-full text-xs">
+                    <tbody id="admin-status-leaderboard">
+                        <tr><td colspan="7" class="text-center text-gray-600 py-6">Sem participantes ainda</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════
      VISTA DO CONSUMIDOR
 ════════════════════════════════════════════ -->
 <div id="consumer-view" class="hidden max-w-lg mx-auto px-4 pt-5 pb-12">
