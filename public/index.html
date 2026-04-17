@@ -66,14 +66,27 @@
 <div id="admin-panel" class="hidden bg-purple-950 border-b-2 border-purple-700 px-4 py-3">
     <div class="max-w-7xl mx-auto space-y-2">
 
-        <!-- Linha 1: cenários + eventos -->
+        <!-- Linha 1: cenário + duração + iniciar + reiniciar -->
         <div class="flex flex-wrap items-center gap-2">
-            <span class="text-purple-300 text-xs font-black uppercase tracking-widest mr-2">🎓 Instrutor</span>
+            <span class="text-purple-300 text-xs font-black uppercase tracking-widest mr-1">🎓 Instrutor</span>
             <button id="btn-start-scen1" class="bg-gray-700 hover:bg-gray-600 border border-gray-600 px-3 py-1.5 rounded-lg font-bold text-xs">⚡ Rede Tradicional</button>
             <button id="btn-start-scen2" class="bg-blue-700 hover:bg-blue-600 border border-blue-500 px-3 py-1.5 rounded-lg font-bold text-xs">🤖 Rede Inteligente</button>
-            <button id="btn-reset"       class="bg-red-900 hover:bg-red-800 border border-red-700 px-3 py-1.5 rounded-lg font-bold text-xs">↺ Reiniciar Tudo</button>
-            <button id="btn-start-session" class="hidden bg-green-700 hover:bg-green-600 active:scale-95 border border-green-500 px-4 py-1.5 rounded-lg font-black text-xs text-white transition-all shadow-md">▶ INICIAR SESSÃO</button>
             <div class="w-px h-5 bg-purple-700 mx-1"></div>
+            <label class="text-purple-300 text-xs font-bold whitespace-nowrap">⏱ Duração:</label>
+            <input  id="session-duration"
+                    type="number" min="1" max="60" value="6" step="1"
+                    class="w-14 bg-gray-800 border border-gray-600 focus:border-purple-400 rounded px-2 py-1.5 text-xs mono text-white text-center outline-none transition-colors"
+                    title="Duração da sessão em minutos">
+            <span class="text-gray-500 text-xs">min</span>
+            <div class="w-px h-5 bg-purple-700 mx-1"></div>
+            <button id="btn-start-session" class="hidden bg-green-700 hover:bg-green-600 active:scale-95 border border-green-500 px-4 py-1.5 rounded-lg font-black text-xs text-white transition-all shadow-md">▶ INICIAR SESSÃO</button>
+            <button id="btn-reset" class="bg-red-900 hover:bg-red-800 border border-red-700 px-3 py-1.5 rounded-lg font-bold text-xs">↺ Reiniciar Tudo</button>
+            <span id="admin-current-scenario" class="text-purple-200 text-xs font-bold ml-auto">Seleciona um cenário para começar</span>
+        </div>
+
+        <!-- Linha 2: injeção de eventos -->
+        <div class="flex flex-wrap items-center gap-2">
+            <span class="text-purple-400 text-xs font-black uppercase tracking-widest mr-1">⚙️ Eventos:</span>
             <select id="admin-group-select" class="bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-xs mono text-gray-300">
                 <option value="">Todos os Nós</option>
                 <option value="1">Nó 1</option>
@@ -89,7 +102,7 @@
             <button id="btn-inject-wind"   class="bg-teal-800 hover:bg-teal-700 border border-teal-700 px-3 py-1.5 rounded-lg text-xs font-bold">🌬️ Vento</button>
         </div>
 
-        <!-- Linha 2: quiz + classificação -->
+        <!-- Linha 3: quiz + classificação -->
         <div class="flex flex-wrap items-center gap-2">
             <span class="text-purple-400 text-xs font-black uppercase tracking-widest mr-1">📝 Quiz:</span>
             <select id="quiz-question-select" class="bg-gray-800 border border-gray-600 rounded px-2 py-1.5 text-xs mono text-gray-300 max-w-xs">
@@ -110,7 +123,6 @@
             <span id="auto-quiz-next" class="hidden text-xs text-gray-600 mono ml-2"></span>
             <div class="w-px h-5 bg-purple-700 mx-1"></div>
             <button id="admin-leaderboard-toggle" class="bg-gray-700 hover:bg-gray-600 border border-gray-600 px-3 py-1.5 rounded-lg text-xs font-bold">📊 Ver Classificação</button>
-            <span id="admin-current-scenario" class="text-purple-200 text-xs font-bold ml-2">Cenário 1 — Rede Elétrica Tradicional</span>
         </div>
 
         <!-- Linha 3: tabela classificação (colapsável) -->

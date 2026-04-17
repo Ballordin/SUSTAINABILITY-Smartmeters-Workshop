@@ -16,10 +16,32 @@ const btnScen1 = document.getElementById('btn-start-scen1');
 const btnScen2 = document.getElementById('btn-start-scen2');
 const btnReset = document.getElementById('btn-reset');
 const btnStartSession = document.getElementById('btn-start-session');
+const durationInput   = document.getElementById('session-duration');
 const adminCurrentScenario = document.getElementById('admin-current-scenario');
 
-btnScen1?.addEventListener('click', () => socket.emit('admin_change_scenario', 1));
-btnScen2?.addEventListener('click', () => socket.emit('admin_change_scenario', 2));
+function getDurationSeconds() {
+    const mins = parseInt(durationInput?.value || '6', 10);
+    return Math.max(60, Math.min(3600, mins * 60)); // entre 1 min e 60 min
+}
+
+btnScen1?.addEventListener('click', () => {
+    if (durationInput && durationInput.value === durationInput.defaultValue) durationInput.value = 6;
+    socket.emit('admin_change_scenario', { id: 1, duration: getDurationSeconds() });
+});
+btnScen2?.addEventListener('click', () => {
+    if (durationInput && parseInt(durationInput.value) < 8) durationInput.value = 10;
+    socket.emit('admin_change_scenario', { id: 2, duration: getDurationSeconds() });
+});
+
+// Atualizar duração em tempo real quando o instrutor altera o campo (antes de iniciar)
+durationInput?.addEventListener('change', () => {
+    socket.emit('admin_update_duration', { duration: getDurationSeconds() });
+    // Atualizar relógio imediatamente no header
+    const secs = getDurationSeconds();
+    const m = Math.floor(secs / 60), s = secs % 60;
+    const timerEl = document.getElementById('timer');
+    if (timerEl) timerEl.textContent = `${m}:${s < 10 ? '0' : ''}${s}`;
+});
 
 btnReset?.addEventListener('click', () => {
     if (confirm('⚠️ Reiniciar tudo?\n\nIsto irá apagar TODOS os dados: métricas, temporizador, papéis, grupos e pontuações dos participantes. Os participantes terão de aguardar o início de uma nova sessão.\n\nTem a certeza?')) socket.emit('admin_reset_game');
@@ -66,7 +88,7 @@ if (btnStartSession) btnStartSession.classList.add('hidden'); // esconder até c
 
 // ─── Botão INICIAR SESSÃO ──────────────────────────────────────────────────────
 btnStartSession?.addEventListener('click', () => {
-    socket.emit('admin_start_session');
+    socket.emit('admin_start_session', { duration: getDurationSeconds() });
     if (btnStartSession) {
         btnStartSession.disabled = true;
         btnStartSession.classList.add('opacity-50', 'cursor-not-allowed');
@@ -92,6 +114,8 @@ socket.on('full_reset', () => {
         btnStartSession.classList.remove('opacity-50', 'cursor-not-allowed');
         btnStartSession.textContent = '▶ INICIAR SESSÃO';
     }
+    // Repor campo de duração
+    if (durationInput) durationInput.value = 6;
     // Repor indicador de cenário ativo
     if (adminCurrentScenario) adminCurrentScenario.textContent = 'Seleciona um cenário para começar';
     btnScen1?.classList.remove('ring-2', 'ring-white');

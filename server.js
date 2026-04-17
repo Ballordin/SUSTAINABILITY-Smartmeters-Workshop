@@ -169,13 +169,14 @@ let gameState = {
     carbonIntensity: 220,
 };
 
-let timerSeconds      = 360; // Cenário 1: 6 minutos
+let timerSeconds      = 360;
+let scenarioDuration  = 360; // definido pelo instrutor; padrão 6 min
 let isGameRunning     = false;
 let pricingTick       = 0;
 let eventTimeline     = [];
 let scenarioSnapshots = {};
 let activeDrRequests  = {};
-let roleSwapDone      = false; // garante troca única por sessão
+let roleSwapDone      = false;
 
 // Quiz state
 let activeQuiz          = null;
@@ -190,8 +191,7 @@ function syncClock(socket) {
 }
 
 function logEvent(type, message, group = null) {
-    const totalTime = gameState.scenario === 1 ? 360 : 600;
-    eventTimeline.push({ time: totalTime - timerSeconds, type, message, group });
+    eventTimeline.push({ time: scenarioDuration - timerSeconds, type, message, group });
 }
 
 function getCurrentCarbonIntensity() {
@@ -260,7 +260,7 @@ function resetGameMetrics() {
         io.to(id).emit('quiz_reset'); // client resets quiz state
     }
 
-    timerSeconds = gameState.scenario === 1 ? 360 : 600;
+    timerSeconds = scenarioDuration;
     isGameRunning = false; pricingTick = 0;
     gameState.pricing = { ...PRICE_TIERS[1] };
     gameState.carbonIntensity = getCurrentCarbonIntensity();
@@ -270,8 +270,9 @@ function resetGameMetrics() {
 }
 
 // ─── Iniciar sessão (separado do reset de métricas) ───────────────────────────
-function startSession() {
-    timerSeconds = gameState.scenario === 1 ? 360 : 600;
+function startSession(customDuration) {
+    if (customDuration) scenarioDuration = customDuration;
+    timerSeconds = scenarioDuration;
     isGameRunning = true;
     pricingTick   = 0;
     roleSwapDone  = false;
@@ -548,7 +549,9 @@ io.on('connection', (socket) => {
     });
 
     // ── Admin events ──────────────────────────────────────────────────────────
-    socket.on('admin_change_scenario', (id) => {
+    socket.on('admin_change_scenario', (payload) => {
+        const id = typeof payload === 'object' ? payload.id : payload;
+        const dur = typeof payload === 'object' && payload.duration ? payload.duration : (id === 1 ? 360 : 600);
         // Guardar snapshot do cenário atual se a sessão estava em curso
         if (isGameRunning) {
             scenarioSnapshots[gameState.scenario] = {
@@ -559,7 +562,8 @@ io.on('connection', (socket) => {
         }
         isGameRunning      = false;
         gameState.scenario = id;
-        timerSeconds       = id === 1 ? 360 : 600;
+        scenarioDuration   = dur;
+        timerSeconds       = dur;
         resetGameMetrics();
         // Enviar temporizador parado para todos os clientes
         const m = Math.floor(timerSeconds / 60), s = timerSeconds % 60;
@@ -567,9 +571,18 @@ io.on('connection', (socket) => {
         io.emit('scenario_changed', { id, name: SCENARIO_NAMES[id] });
     });
 
-    socket.on('admin_start_session', () => {
-        if (isGameRunning) return; // já em curso — ignorar
-        startSession();
+    socket.on('admin_start_session', (payload) => {
+        if (isGameRunning) return;
+        const dur = payload?.duration || scenarioDuration;
+        startSession(dur);
+    });
+
+    socket.on('admin_update_duration', ({ duration }) => {
+        if (isGameRunning) return; // não alterar durante sessão ativa
+        scenarioDuration = Math.max(60, Math.min(3600, duration));
+        timerSeconds     = scenarioDuration;
+        const m = Math.floor(timerSeconds / 60), s = timerSeconds % 60;
+        io.emit('time_update', `${m}:${s < 10 ? '0' : ''}${s}`);
     });
 
     socket.on('admin_reset_game', () => {
@@ -600,8 +613,9 @@ io.on('connection', (socket) => {
         if (quizDeadlineTimeout) { clearTimeout(quizDeadlineTimeout); quizDeadlineTimeout = null; }
         activeQuiz = null; quizAnswers = {};
 
-        // ── Repor temporizador (C1 = 6 min) ───────────────────────────────────
-        timerSeconds = 360;
+        // ── Repor temporizador (padrão 6 min) ─────────────────────────────────
+        scenarioDuration = 360;
+        timerSeconds     = 360;
         const m = Math.floor(timerSeconds / 60), s = timerSeconds % 60;
 
         // ── Notificar todos os clientes ────────────────────────────────────────
@@ -898,7 +912,7 @@ setInterval(() => {
     io.emit('time_update', `${m}:${s < 10 ? '0' : ''}${s}`);
 
     // ── Troca de papéis a meio da sessão (uma única vez) ──────────────────────
-    const halfTime = gameState.scenario === 1 ? 180 : 300;
+    const halfTime = Math.floor(scenarioDuration / 2);
     if (!roleSwapDone && timerSeconds === halfTime + 5) {
         io.emit('role_swap_alert', { message: '🔄 Troca de papéis em 5 segundos!' });
     }
