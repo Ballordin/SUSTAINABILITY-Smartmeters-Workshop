@@ -200,8 +200,24 @@ function getCurrentCarbonIntensity() {
 
 function assignRoleAndGroup(socket, name) {
     const group = Math.floor(Math.random() * 4) + 1;
-    const role  = gameState.managers.length === 0 ? 'manager' : 'consumer';
-    if (role === 'manager') gameState.managers.push(socket.id);
+
+    // Calcular o total de utilizadores (já conectados + 1 que está a entrar agora)
+    const totalUsers = Object.keys(gameState.users).length + 1;
+
+    // Determinar o número ideal de gestores com base nas tuas regras
+    let targetManagers = 1;
+    if (totalUsers > 32) {
+        targetManagers = 3;
+    } else if (totalUsers > 16) {
+        targetManagers = 2;
+    }
+
+    // Se ainda não atingimos o alvo de gestores, este jogador vira gestor
+    let role = 'consumer';
+    if (gameState.managers.length < targetManagers) {
+        role = 'manager';
+        gameState.managers.push(socket.id);
+    }
 
     gameState.users[socket.id] = {
         role, group,
@@ -880,19 +896,44 @@ function buildLeaderboard() {
 }
 
 function rotateManagers() {
-    if (Object.keys(gameState.users).length < 2) return;
-    const oldId = gameState.managers.shift();
+    // Procurar todos os consumidores elegíveis
     const consumers = Object.keys(gameState.users).filter(id => gameState.users[id].role === 'consumer');
-    if (consumers.length > 0) {
-        const newId = consumers[Math.floor(Math.random() * consumers.length)];
+    const currentManagerCount = gameState.managers.length;
+
+    // Se não houver consumidores suficientes para substituir os gestores, cancela
+    if (consumers.length < currentManagerCount) return;
+
+    // Guardar os IDs dos gestores antigos e limpar a lista oficial
+    const oldManagers = [...gameState.managers];
+    gameState.managers = [];
+
+    // Fazer a troca um por um
+    for (const oldId of oldManagers) {
+        // Escolher um consumidor aleatório e removê-lo da lista de elegíveis
+        const randomIndex = Math.floor(Math.random() * consumers.length);
+        const newId = consumers.splice(randomIndex, 1)[0];
+
+        // 1. Despromover o Gestor antigo para Consumidor
         if (gameState.users[oldId]) {
             gameState.users[oldId].role = 'consumer';
-            io.to(oldId).emit('role_assigned', { role: 'consumer', group: gameState.users[oldId].group, scenario: gameState.scenario, name: gameState.users[oldId].name, scenarioName: SCENARIO_NAMES[gameState.scenario] });
+            io.to(oldId).emit('role_assigned', { 
+                role: 'consumer', group: gameState.users[oldId].group, 
+                scenario: gameState.scenario, name: gameState.users[oldId].name, 
+                scenarioName: SCENARIO_NAMES[gameState.scenario] 
+            });
         }
-        gameState.users[newId].role = 'manager';
-        gameState.managers.push(newId);
-        io.to(newId).emit('role_assigned', { role: 'manager', group: gameState.users[newId].group, scenario: gameState.scenario, name: gameState.users[newId].name, scenarioName: SCENARIO_NAMES[gameState.scenario] });
-    } else if (oldId) gameState.managers.push(oldId);
+
+        // 2. Promover o Consumidor antigo a Gestor
+        if (gameState.users[newId]) {
+            gameState.users[newId].role = 'manager';
+            gameState.managers.push(newId);
+            io.to(newId).emit('role_assigned', { 
+                role: 'manager', group: gameState.users[newId].group, 
+                scenario: gameState.scenario, name: gameState.users[newId].name, 
+                scenarioName: SCENARIO_NAMES[gameState.scenario] 
+            });
+        }
+    }
 }
 
 // ─── Ciclo principal (1 segundo) ──────────────────────────────────────────────
