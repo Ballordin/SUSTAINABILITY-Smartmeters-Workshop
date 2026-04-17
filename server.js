@@ -467,7 +467,7 @@ io.on('connection', (socket) => {
         if (gameState.groups[g].shed) return;
         gameState.groups[g].shed = true;
         gameState.metrics.outages++;
-        gameState.metrics.stabilityScore = Math.max(0, gameState.metrics.stabilityScore - 8);
+        gameState.metrics.stabilityScore = Math.max(0, gameState.metrics.stabilityScore - 15); 
         logEvent('shed', `Corte de carga no Nó ${g}`, g);
         for (const [id, user] of Object.entries(gameState.users)) {
             if (user.group == g && user.role === 'consumer' && user.powered) {
@@ -755,7 +755,7 @@ function triggerOutage(id, user, reason) {
     user.havoc += reason === 'overload' ? 50 : 10;
     io.to(id).emit('update_havoc', user.havoc);
     gameState.metrics.outages++;
-    gameState.metrics.stabilityScore = Math.max(0, gameState.metrics.stabilityScore - 8);
+    gameState.metrics.stabilityScore = Math.max(0, gameState.metrics.stabilityScore - 15); 
     logEvent('outage', `Apagão no Nó ${user.group} (${reason})`, user.group);
     gameState.managers.forEach(mId => io.to(mId).emit('new_ticket', { group: user.group, userId: id }));
 }
@@ -841,15 +841,19 @@ function updateCarbonTracking() {
     const ci = getCurrentCarbonIntensity();
     gameState.carbonIntensity = ci;
     let sessionKw = 0;
+
+    cosnt TIME_MULT = 120;
     for (const [id, u] of Object.entries(gameState.users)) {
         if (u.role !== 'consumer') continue;
         const kw = (u.consumption / 100) * 3.45;
         sessionKw += Math.max(0, kw);
         const hourlyGrams = kw * ci;
-        u.carbonFootprint = (u.carbonFootprint || 0) + hourlyGrams / 3600;
+        
+        const co2Increment = (hourlyGrams / 3600) * TIME_MULT;
+        u.carbonFootprint = (u.carbonFootprint || 0) + co2Increment;
         io.to(id).emit('carbon_update', { intensity: ci, footprint: Math.round(u.carbonFootprint), hourlyRate: Math.round(hourlyGrams) });
     }
-    gameState.metrics.totalCO2 += (sessionKw * ci) / 3600;
+    gameState.metrics.totalCO2 += (sessionKw * ci) / 3600 * TIME_MULT;
 }
 
 function resolveDrVotes() {
@@ -865,7 +869,8 @@ function resolveDrVotes() {
 
 function updateStability() {
     // Slowly recover stability when grid is running fine
-    gameState.metrics.stabilityScore = Math.min(100, gameState.metrics.stabilityScore + 0.03);
+    gameState.metrics.stabilityScore = Math.min(100, gameState.metrics.stabilityScore + 0.01);
+} 
 }
 
 function buildLeaderboard() {

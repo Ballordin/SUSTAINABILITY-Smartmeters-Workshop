@@ -515,12 +515,15 @@ socket.on('show_leaderboard_popup', (entries) => {
         ? '<p class="text-gray-600 text-sm text-center py-4">Sem participantes ainda.</p>'
         : entries.map((e, i) => {
             const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i+1}`;
+            const havocColor = e.havoc > 30 ? 'text-red-400' : 'text-gray-500'; // Destaca o havoc a vermelho se for alto
+            
             return `
                 <div class="flex items-center gap-3 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm ${e.id === socket.id ? 'border-yellow-500' : ''}">
                     <span class="w-6 text-center font-black">${medal}</span>
                     <span class="flex-1 font-bold ${e.id === socket.id ? 'text-yellow-300' : 'text-white'} truncate">${e.name}</span>
-                    <span class="text-blue-400 mono font-black shrink-0">📝 ${e.quizScore} pts</span>
-                    <span class="text-green-400 mono text-xs shrink-0">✅ ${e.compliance}</span>
+                    <span class="text-blue-400 mono font-black shrink-0" title="Pontos Quiz">📝 ${e.quizScore}</span>
+                    <span class="text-green-400 mono text-xs shrink-0" title="Cumprimento">✅ ${e.compliance}</span>
+                    <span class="${havocColor} mono text-xs font-bold shrink-0" title="Caos (Havoc)">🔥 ${e.havoc}</span>
                 </div>`;
         }).join('');
     leaderboardPopup.classList.remove('hidden');
