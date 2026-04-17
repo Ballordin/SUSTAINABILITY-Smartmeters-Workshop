@@ -842,7 +842,7 @@ function updateCarbonTracking() {
     gameState.carbonIntensity = ci;
     let sessionKw = 0;
 
-    cosnt TIME_MULT = 120;
+    const TIME_MULT = 120;
     for (const [id, u] of Object.entries(gameState.users)) {
         if (u.role !== 'consumer') continue;
         const kw = (u.consumption / 100) * 3.45;
@@ -870,7 +870,7 @@ function resolveDrVotes() {
 function updateStability() {
     // Slowly recover stability when grid is running fine
     gameState.metrics.stabilityScore = Math.min(100, gameState.metrics.stabilityScore + 0.01);
-} 
+
 }
 
 function buildLeaderboard() {
